@@ -9,6 +9,8 @@ import { screenStreamStart, screenStreamStop, sendInputEvent } from "../../lib/t
 import { base64ToUint8Array } from "../../lib/encoding";
 import { loadSettings, subscribeSettings, type AppSettings } from "../../lib/settings";
 import { Spinner } from "../ui/Spinner";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { FeatureContextBar } from "../ui/FeatureContextBar";
 
 const SCREEN_W = 128;
 const SCREEN_H = 64;
@@ -462,6 +464,8 @@ export function ScreenViewer() {
           : "flex-1 min-h-0 flex flex-col bg-app overflow-hidden"
       }
     >
+      <TutorialBanner topicId="screen" />
+      <FeatureContextBar topicId="screen" />
       {/* Header */}
       <div ref={headerRef} className="flex items-center justify-between px-3 py-2 border-b border-border-subtle bg-panel/50 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">

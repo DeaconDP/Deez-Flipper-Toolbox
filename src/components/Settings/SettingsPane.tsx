@@ -34,6 +34,10 @@ import {
   normalizeHex,
 } from "../../lib/theme";
 import { LibraryExclusionsEditor } from "./LibraryExclusionsEditor";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { FeatureContextBar } from "../ui/FeatureContextBar";
+import { useTutorialMode } from "../../hooks/useTutorialMode";
+import { getSettingHint } from "../../lib/tutorialContent";
 
 const IS_MACOS =
   typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
@@ -200,21 +204,24 @@ export function SettingsPane() {
         <header className="flex items-baseline justify-between">
           <h1 className="text-base font-medium text-primary">Settings</h1>
           <span className="text-xs text-dim">
-            {version ? `FlipperUI v${version}` : ""}
+            {version ? `Deez Flipper Tools v${version}` : ""}
           </span>
         </header>
+
+        <TutorialBanner topicId="settings" />
+        <FeatureContextBar topicId="settings" />
 
         <Section icon={<Info size={13} />} title="About">
           <div className="flex items-center gap-3">
             <img
               src="/flipperui-icon.png"
-              alt="FlipperUI"
+              alt="Deez Flipper Tools"
               width={48}
               height={48}
               className="rounded-lg shadow"
             />
             <div className="flex flex-col text-xs">
-              <span className="text-primary font-medium">FlipperUI</span>
+              <span className="text-primary font-medium">Deez Flipper Tools</span>
               <span className="text-secondary">A Flipper Zero Manager and qFlipper replacement, focused on file browsing and organized libraries for SubGHz, Infrared, NFC and everything else.</span>
               <span className="text-dim italic mt-0.5">in love -maz</span>
               <button
@@ -229,7 +236,7 @@ export function SettingsPane() {
         </Section>
 
         <Section icon={<Languages size={13} />} title="General">
-          <Row label="Language" hint="More languages will arrive with i18n.">
+          <Row label="Language" hint="More languages will arrive with i18n." tutorialId="language">
             <select
               value={settings?.language ?? "en"}
               onChange={(e) => onLanguageChange(e.target.value)}
@@ -243,11 +250,27 @@ export function SettingsPane() {
               ))}
             </select>
           </Row>
+          <Row
+            label="Feature hints"
+            hint="Show plain-language descriptions on each screen."
+            tutorialId="feature-hints"
+          >
+            <Toggle
+              checked={settings?.hints.enabled ?? true}
+              onChange={async (enabled) => {
+                const next = await updateSettings({ hints: { enabled } });
+                setSettings(next);
+              }}
+              disabled={!settings}
+              ariaLabel="Feature hints"
+            />
+          </Row>
         </Section>
 
         <Section icon={<Palette size={13} />} title="Appearance">
           <Row
             label="App icon"
+            tutorialId="app-icon"
             hint={
               IS_MACOS
                 ? "Pick the icon used in the Dock and switcher. Changes apply immediately."
@@ -268,6 +291,7 @@ export function SettingsPane() {
           <div className="h-px bg-border-subtle" />
           <Row
             label="Theme accent"
+            tutorialId="theme-accent"
             hint="Tint applied to highlights, focus rings, and active states. The FlipperUI brand orange in the splash and app header stays as-is."
           >
             <span />
@@ -282,6 +306,7 @@ export function SettingsPane() {
         <Section icon={<MonitorCog size={13} />} title="System">
           <Row
             label="Show tray icon"
+            tutorialId="tray-enabled"
             hint="Show the FlipperUI icon in the system tray / menubar. Left-click toggles the window; right-click opens Show/Hide/Quit."
           >
             <Toggle
@@ -293,6 +318,7 @@ export function SettingsPane() {
           </Row>
           <Row
             label="Monochrome tray icon"
+            tutorialId="tray-monochrome"
             hint={
               IS_MACOS
                 ? "Use a flat glyph that adopts the menubar's foreground color (light/dark mode aware)."
@@ -309,6 +335,7 @@ export function SettingsPane() {
           {IS_MACOS && (
             <Row
               label="Hide Dock icon"
+              tutorialId="tray-hide-dock"
               hint={
                 settings?.tray.enabled
                   ? "Run as a menubar-only app. The tray icon remains the way to reach the window."
@@ -328,7 +355,8 @@ export function SettingsPane() {
         <Section icon={<Plug size={13} />} title="Connection">
           <Row
             label="Auto-connect & auto-reconnect"
-            hint="When on, FlipperUI automatically connects to a Flipper as soon as it shows up (USB port detected, or last-paired BLE peripheral) and reconnects after an unexpected drop. Off by default — click Connect manually."
+            tutorialId="auto-reconnect"
+            hint="When on, Deez Flipper Tools automatically connects to a Flipper as soon as it shows up (USB port detected, or last-paired BLE peripheral) and reconnects after an unexpected drop. Off by default — click Connect manually."
           >
             <Toggle
               checked={settings?.connection.autoReconnect ?? false}
@@ -339,6 +367,7 @@ export function SettingsPane() {
           </Row>
           <Row
             label="Sync clock on connect"
+            tutorialId="sync-clock"
             hint="Set the Flipper RTC from this computer's local date and time after each successful USB or BLE connection."
           >
             <Toggle
@@ -353,11 +382,12 @@ export function SettingsPane() {
         <Section icon={<FolderCog size={13} />} title="File Browser">
           <Row
             label="Inline action icons"
+            tutorialId="inline-actions"
             hint="Choose which action icons appear on hover for each file row. All actions are always available via right-click."
           >
             <span />
           </Row>
-          <Row label="Rename">
+          <Row label="Rename" tutorialId="inline-rename">
             <Toggle
               checked={settings?.fileBrowser.inlineActions.rename ?? true}
               disabled={!settings}
@@ -365,7 +395,7 @@ export function SettingsPane() {
               ariaLabel="Show rename icon inline"
             />
           </Row>
-          <Row label="Download">
+          <Row label="Download" tutorialId="inline-download">
             <Toggle
               checked={settings?.fileBrowser.inlineActions.download ?? true}
               disabled={!settings}
@@ -373,7 +403,7 @@ export function SettingsPane() {
               ariaLabel="Show download icon inline"
             />
           </Row>
-          <Row label="Delete">
+          <Row label="Delete" tutorialId="inline-delete">
             <Toggle
               checked={settings?.fileBrowser.inlineActions.delete ?? true}
               disabled={!settings}
@@ -386,6 +416,7 @@ export function SettingsPane() {
         <Section icon={<Bell size={13} />} title="Notifications">
           <Row
             label="Library scan finished"
+            tutorialId="notif-library"
             hint="Show a desktop notification each time a library scan (Sub-GHz / Infrared / NFC / RFID / BadUSB / Apps) finishes. The first notification will prompt for OS-level permission."
           >
             <Toggle
@@ -397,6 +428,7 @@ export function SettingsPane() {
           </Row>
           <Row
             label="Device disconnected"
+            tutorialId="notif-disconnect"
             hint="Show a desktop notification when the Flipper drops unexpectedly. Manual disconnects via the toolbar never notify."
           >
             <Toggle
@@ -411,6 +443,7 @@ export function SettingsPane() {
         <Section icon={<MonitorPlay size={13} />} title="Screen Stream">
           <Row
             label="Screenshot folder"
+            tutorialId="screenshot-dir"
             hint="Default folder for `Save screenshot`. The save dialog still appears so you can rename or pick a different location each time."
           >
             <DirectoryPicker
@@ -422,6 +455,7 @@ export function SettingsPane() {
           </Row>
           <Row
             label="GIF recording folder"
+            tutorialId="gif-dir"
             hint="Default folder for the GIF recorder's save dialog."
           >
             <DirectoryPicker
@@ -436,6 +470,7 @@ export function SettingsPane() {
         <Section icon={<Filter size={13} />} title="Library Exclusions">
           <Row
             label="Pre-scan review"
+            tutorialId="pre-scan-review"
             hint="Before each library scan, surface directories with 254+ entries or files larger than 1 MiB so you can exclude them. Excluded folders are saved here. Doesn't apply to the Apps library."
           >
             <Toggle
@@ -450,6 +485,7 @@ export function SettingsPane() {
             disabled={!settings}
             onChange={setSettings}
           />
+          <SettingTutorialExtra id="library-exclusions" />
         </Section>
 
         <Section icon={<LayoutGrid size={13} />} title="Apps">
@@ -462,9 +498,27 @@ export function SettingsPane() {
             reserved={["/ext/apps"]}
             onChange={onAppsExtraChange}
           />
+          <SettingTutorialExtra id="apps-extra-dirs" />
         </Section>
 
         <Section icon={<Wrench size={13} />} title="Developer">
+          <label className="block text-xs text-secondary space-y-1">
+            esptool path (WiFi board flashing)
+            <SettingTutorialExtra id="esptool-path" />
+            <input
+              type="text"
+              className="w-full mt-1 px-2 py-1.5 rounded border border-border-subtle bg-surface text-primary text-xs font-mono"
+              placeholder="Leave empty for auto-detect (python -m esptool or uvx)"
+              value={settings?.tools.esptoolPath ?? ""}
+              disabled={!settings}
+              onChange={async (e) => {
+                const next = await updateSettings({
+                  tools: { esptoolPath: e.target.value || null },
+                });
+                setSettings(next);
+              }}
+            />
+          </label>
           <button
             onClick={() => setDiagOpen(true)}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-secondary hover:text-primary hover:bg-surface/60 rounded border border-border-subtle transition-colors text-left"
@@ -473,6 +527,7 @@ export function SettingsPane() {
             <span className="flex-1">Developer diagnostics</span>
             <span className="text-dim">Open →</span>
           </button>
+          <SettingTutorialExtra id="developer-diag" />
         </Section>
 
         <SettingsFooter version={version} />
@@ -528,6 +583,13 @@ function SettingsFooter({ version }: { version: string | null }) {
   );
 }
 
+function SettingTutorialExtra({ id }: { id: string }) {
+  const { enabled, collapsed } = useTutorialMode();
+  const hint = getSettingHint(id);
+  if (!enabled || collapsed || !hint) return null;
+  return <p className="text-[11px] text-muted leading-relaxed">{hint}</p>;
+}
+
 function Section({
   icon,
   title,
@@ -551,17 +613,25 @@ function Section({
 function Row({
   label,
   hint,
+  tutorialId,
   children,
 }: {
   label: string;
   hint?: string;
+  tutorialId?: string;
   children: React.ReactNode;
 }) {
+  const { enabled: tutorialMode, collapsed: tutorialCollapsed } = useTutorialMode();
+  const tutorialHint = tutorialId ? getSettingHint(tutorialId) : undefined;
+
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex flex-col">
         <span className="text-xs text-primary">{label}</span>
         {hint && <span className="text-[11px] text-dim mt-0.5">{hint}</span>}
+        {tutorialMode && !tutorialCollapsed && tutorialHint && (
+          <span className="text-[11px] text-muted mt-1 leading-relaxed">{tutorialHint}</span>
+        )}
       </div>
       <div className="shrink-0">{children}</div>
     </div>

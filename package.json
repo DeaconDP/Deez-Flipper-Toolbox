@@ -1,7 +1,8 @@
 {
-  "name": "flipperui",
-  "private": true,
-  "version": "0.4.5",
+  "name": "deez-flipper-toolbox",
+  "private": false,
+  "version": "1.0.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

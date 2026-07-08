@@ -277,6 +277,57 @@ export const subghzTxStop = async (): Promise<void> => {
   return invoke<void>("subghz_tx_stop");
 };
 
+export const nfcEmulateStart = async (path: string): Promise<void> => {
+  await awaitCliCleanup();
+  return invoke<void>("nfc_emulate_start", { path });
+};
+
+export const nfcEmulateStop = async (): Promise<void> => {
+  await awaitCliCleanup();
+  return invoke<void>("nfc_emulate_stop");
+};
+
+export const rfidEmulateStart = async (path: string): Promise<void> => {
+  await awaitCliCleanup();
+  return invoke<void>("rfid_emulate_start", { path });
+};
+
+export const rfidEmulateStop = async (): Promise<void> => {
+  await awaitCliCleanup();
+  return invoke<void>("rfid_emulate_stop");
+};
+
+export const infraredTxStart = async (path: string): Promise<void> => {
+  await awaitCliCleanup();
+  return invoke<void>("infrared_tx_start", { path });
+};
+
+export const infraredTxStop = async (): Promise<void> => {
+  await awaitCliCleanup();
+  return invoke<void>("infrared_tx_stop");
+};
+
+export const badusbRunStart = async (path: string): Promise<void> => {
+  await awaitCliCleanup();
+  return invoke<void>("badusb_run_start", { path });
+};
+
+export const badusbRunStop = async (): Promise<void> => {
+  await awaitCliCleanup();
+  return invoke<void>("badusb_run_stop");
+};
+
+export const firmwareDeploySdZip = async (
+  localPath: string,
+  clean = true,
+): Promise<void> => {
+  await awaitCliCleanup();
+  return invoke<void>("firmware_deploy_sd_zip", {
+    local_path: localPath,
+    clean,
+  });
+};
+
 // ── Sub-GHz library ──────────────────────────────────────────────────────
 
 /**

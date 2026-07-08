@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    flipperui_lib::run()
+    deez_flipper_tools_lib::run()
 }

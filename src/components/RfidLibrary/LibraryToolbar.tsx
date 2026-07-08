@@ -2,6 +2,7 @@ import { RefreshCw, Search, Upload, X, RadioTower } from "lucide-react";
 import { useFlipperStore } from "../../store/useFlipperStore";
 import { ScanProgressBar } from "../ui/ScanProgressBar";
 import { formatRelative } from "../../lib/format";
+import { FeatureContextBar } from "../ui/FeatureContextBar";
 
 interface Props {
   keyTypes: string[];
@@ -98,6 +99,8 @@ export function LibraryToolbar({
           </button>
         )}
       </div>
+
+      <FeatureContextBar topicId="rfid" />
 
       <div className="flex items-center gap-2 px-3 pb-2">
         <div className="relative flex-1 max-w-xs">

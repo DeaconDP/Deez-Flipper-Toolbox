@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bluetooth,
+  HardDriveDownload,
+  Hammer,
+  Code2,
+  Cpu,
+  Pencil,
   FolderTree,
   Home,
   Info,
   Monitor,
   Power,
+  Radio,
   Search,
   Settings as SettingsIcon,
   Terminal,
+  GraduationCap,
   Usb,
   Zap,
   type LucideIcon,
 } from "lucide-react";
 import { useFlipperStore, type ActiveView } from "../../store/useFlipperStore";
 import { disconnect, reboot } from "../../lib/tauri";
+import { stopAllLibrarySessions } from "../../lib/librarySessions";
+import { useTutorialMode } from "../../hooks/useTutorialMode";
 
 type CommandKind = "nav" | "action";
 
@@ -43,6 +52,7 @@ export function CommandPalette() {
   const setError = useFlipperStore((s) => s.setError);
   const isConnected = useFlipperStore((s) => s.isConnected);
   const connectionKind = useFlipperStore((s) => s.connectionKind);
+  const { enabled: tutorialEnabled, collapsed: tutorialCollapsed, toggle: toggleTutorial, toggleCollapsed: toggleTutorialCollapsed } = useTutorialMode();
 
   // Cmd/Ctrl+K toggles open. Esc closes. Open from anywhere — including inside
   // input fields — so the user always has an escape hatch to navigate.
@@ -92,9 +102,16 @@ export function CommandPalette() {
       { id: "nav:nfc", kind: "nav", label: "NFC library", Icon: Zap, keywords: ["card", "13.56", "mifare"], run: () => navigate("nfc") },
       { id: "nav:rfid", kind: "nav", label: "RFID library", Icon: Zap, keywords: ["lf", "lfrfid", "125khz", "em4100", "prox"], run: () => navigate("rfid") },
       { id: "nav:badusb", kind: "nav", label: "BadUSB library", Icon: Zap, keywords: ["ducky", "keystrokes"], run: () => navigate("badusb") },
-      { id: "nav:screen", kind: "nav", label: "Live screen", Icon: Monitor, keywords: ["mirror", "stream"], disabledReason: !isConnected ? "Connect first" : undefined, run: () => navigate("screen") },
+      { id: "nav:screen", kind: "nav", label: "Screen mirror", Icon: Monitor, keywords: ["mirror", "stream", "live"], disabledReason: !isConnected ? "Connect first" : undefined, run: () => navigate("screen") },
+      { id: "nav:gpio", kind: "nav", label: "GPIO", Icon: Zap, keywords: ["pins", "uart", "header", "expansion"], disabledReason: !isConnected ? "Connect first" : undefined, run: () => navigate("gpio") },
       { id: "nav:cli", kind: "nav", label: "Terminal", Icon: Terminal, keywords: ["cli", "shell"], disabledReason: !isConnected ? "Connect first" : connectionKind === "ble" ? "Not available over BLE" : undefined, run: () => navigate("cli") },
       { id: "nav:info", kind: "nav", label: "Device info", Icon: Info, keywords: ["firmware", "battery"], disabledReason: !isConnected ? "Connect first" : undefined, run: () => navigate("info") },
+      { id: "nav:backup", kind: "nav", label: "Backup", Icon: HardDriveDownload, keywords: ["restore", "archive"], disabledReason: !isConnected ? "Connect first" : undefined, run: () => navigate("backup") },
+      { id: "nav:firmware", kind: "nav", label: "Firmware", Icon: Cpu, keywords: ["update", "flash", "os"], run: () => navigate("firmware") },
+      { id: "nav:fbt", kind: "nav", label: "FBT Build Studio", Icon: Hammer, keywords: ["build", "compile", "custom"], run: () => navigate("fbt") },
+      { id: "nav:editors", kind: "nav", label: "Signal editors", Icon: Pencil, keywords: ["subghz", "ir", "nfc", "edit"], run: () => navigate("editors") },
+      { id: "nav:devstudio", kind: "nav", label: "Dev Studio", Icon: Code2, keywords: ["ufbt", "fap", "deploy"], run: () => navigate("devstudio") },
+      { id: "nav:wifiboard", kind: "nav", label: "WiFi Board", Icon: Radio, keywords: ["esp32", "marauder", "wifi", "flash", "field"], run: () => navigate("wifiboard") },
       { id: "nav:settings", kind: "nav", label: "Settings", Icon: SettingsIcon, keywords: ["preferences", "config"], run: () => navigate("settings") },
     ];
 
@@ -109,6 +126,7 @@ export function CommandPalette() {
         run: async () => {
           close();
           try {
+            await stopAllLibrarySessions().catch(() => {});
             await disconnect();
             setConnected(null);
           } catch (e) {
@@ -150,10 +168,35 @@ export function CommandPalette() {
           }
         },
       },
+      {
+        id: "act:tutorial",
+        kind: "action",
+        label: tutorialEnabled ? "Turn off tutorial mode" : "Turn on tutorial mode",
+        hint: "Show Flipper feature explanations and learn-more links throughout the app",
+        Icon: GraduationCap,
+        keywords: ["help", "learn", "guide", "docs", "tutorial"],
+        run: async () => {
+          close();
+          await toggleTutorial();
+        },
+      },
+      {
+        id: "act:tutorial-collapse",
+        kind: "action",
+        label: tutorialCollapsed ? "Expand tutorial info" : "Collapse tutorial info",
+        hint: "Minimize or restore tutorial panels across all views",
+        Icon: GraduationCap,
+        keywords: ["help", "learn", "guide", "minimize", "hide", "collapse", "expand"],
+        disabledReason: !tutorialEnabled ? "Turn on tutorial mode first" : undefined,
+        run: async () => {
+          close();
+          await toggleTutorialCollapsed();
+        },
+      },
     ];
 
     return [...navItems, ...actionItems];
-  }, [isConnected, connectionKind, navigate, close, setConnected, setError]);
+  }, [isConnected, connectionKind, navigate, close, setConnected, setError, tutorialEnabled, tutorialCollapsed, toggleTutorial, toggleTutorialCollapsed]);
 
   const filtered = useMemo(() => fuzzyFilter(commands, query), [commands, query]);
 

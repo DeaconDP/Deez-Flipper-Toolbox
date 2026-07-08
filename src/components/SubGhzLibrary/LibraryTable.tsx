@@ -18,8 +18,9 @@ import { useFlipperStore } from "../../store/useFlipperStore";
 import { useExportDrag } from "../../hooks/useExportDrag";
 import { relativeDir, parentDir, nextDuplicateName } from "../../lib/path";
 import { formatMtime } from "../../lib/format";
-import { storageRead, storageRename, storageWrite, storageDelete } from "../../lib/tauri";
+import { storageRead, storageRename, storageWrite, storageDelete, subghzTxStart, subghzTxStop } from "../../lib/tauri";
 import { saveSubghzCache } from "../../lib/subghzCache";
+import { confirmLibraryAction, stopAllLibrarySessions } from "../../lib/librarySessions";
 import { ContextMenu, type MenuItem } from "../ui/ContextMenu";
 import type { SubGhzEntry } from "../../types/subghz";
 
@@ -195,10 +196,13 @@ function Row({
   const setError = useFlipperStore((s) => s.setSubghzError);
   const setEntries = useFlipperStore((s) => s.setSubghzEntries);
   const deviceUid = useFlipperStore((s) => s.deviceInfo?.hardware_uid ?? null);
+  const isConnected = useFlipperStore((s) => s.isConnected);
+  const transmittingPath = useFlipperStore((s) => s.subghzTransmittingPath);
+  const setTransmittingPath = useFlipperStore((s) => s.setSubghzTransmittingPath);
 
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
-  const [busy, setBusy] = useState<"rename" | "dup" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"rename" | "dup" | "delete" | "tx" | null>(null);
 
   const relDir = relativeDir(entry.path, SUBGHZ_ROOT);
   const handleDragStart = useExportDrag(entry.path, entry.name);
@@ -300,6 +304,45 @@ function Row({
       await persistList(allEntries.filter((e) => e.path !== entry.path));
     } catch (e) {
       setError(`Delete failed: ${(e as Error).message || String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const isTransmitting = transmittingPath === entry.path;
+  const anyTransmitting = transmittingPath !== null;
+
+  const onToggleTx = async () => {
+    if (!isConnected) {
+      setError("Connect a Flipper to transmit.");
+      return;
+    }
+    if (isTransmitting) {
+      setBusy("tx");
+      try {
+        await subghzTxStop();
+        setTransmittingPath(null);
+      } catch (e) {
+        setError(`Stop TX failed: ${(e as Error).message || String(e)}`);
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+    if (anyTransmitting) return;
+    const ok = await confirmLibraryAction(
+      "Transmit Sub-GHz signal",
+      `Transmit ${entry.name} on the Flipper radio?\n\nOnly use on frequencies and signals you are legally allowed to transmit.`,
+    );
+    if (!ok) return;
+    setBusy("tx");
+    try {
+      await stopAllLibrarySessions();
+      await subghzTxStart(entry.path);
+      setTransmittingPath(entry.path);
+    } catch (e) {
+      setError(`TX failed: ${(e as Error).message || String(e)}`);
+      setTransmittingPath(null);
     } finally {
       setBusy(null);
     }
@@ -457,12 +500,25 @@ function Row({
           <Trash2 size={13} />
         </button>
         <button
-          disabled
-          title="One-click TX is temporarily disabled — WIP, finishing the RPC flow"
-          className="flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border border-border-subtle text-dim opacity-40 cursor-not-allowed"
+          onClick={() => void onToggleTx()}
+          disabled={!isConnected || (anyTransmitting && !isTransmitting) || busy !== null || renaming}
+          title={
+            !isConnected
+              ? "Connect a Flipper to transmit"
+              : isTransmitting
+                ? "Stop transmission"
+                : anyTransmitting
+                  ? "Another signal is transmitting"
+                  : "Transmit on Flipper"
+          }
+          className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+            isTransmitting
+              ? "border-danger/50 bg-danger/15 text-danger animate-pulse"
+              : "border-border-subtle text-secondary hover:text-accent hover:border-accent/40"
+          }`}
         >
           <Radio size={10} />
-          TX
+          {isTransmitting ? "Stop" : "TX"}
         </button>
       </div>
     </div>

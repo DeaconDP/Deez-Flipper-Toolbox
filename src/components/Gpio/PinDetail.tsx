@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Eye, EyeOff, Power, Zap, AlertTriangle } from "lucide-react";
+import { Eye, EyeOff, Power, Zap, AlertTriangle, Radio } from "lucide-react";
 import type {
   GpioMode,
   GpioPinName,
   GpioPull,
   HeaderPin,
 } from "../../types/gpio";
+import { useFlipperStore } from "../../store/useFlipperStore";
 import { Sparkline } from "./Sparkline";
 
 interface RpcPinDetailProps {
@@ -18,6 +19,7 @@ interface RpcPinDetailProps {
   lastAction: string | null;
   lastActionAt: number | null;
   busy: boolean;
+  otg: boolean;
   onSetMode: (mode: GpioMode) => void;
   onSetPull: (pull: GpioPull) => void;
   onToggleWatch: () => void;
@@ -37,6 +39,7 @@ export function RpcPinDetail({
   lastAction,
   lastActionAt,
   busy,
+  otg,
   onSetMode,
   onSetPull,
   onToggleWatch,
@@ -80,6 +83,8 @@ export function RpcPinDetail({
           onPulse={onPulse}
         />
       )}
+
+      <WifiBoardWiringCallout pinName={pin.name} otg={otg} />
 
       <Footer text={lastAction} ts={lastActionAt} />
     </div>
@@ -406,6 +411,50 @@ function Segmented({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function WifiBoardWiringCallout({
+  pinName,
+  otg,
+}: {
+  pinName: string;
+  otg: boolean;
+}) {
+  const setActiveView = useFlipperStore((s) => s.setActiveView);
+  if (pinName !== "PC0" && pinName !== "PC1") return null;
+
+  const role =
+    pinName === "PC1"
+      ? "USART1 TX — connect to ESP RX"
+      : "USART1 RX — connect to ESP TX";
+
+  return (
+    <div className="rounded-md border border-accent/30 bg-accent/5 p-3 space-y-2 text-xs">
+      <div className="flex items-center gap-1.5 font-medium text-accent">
+        <Radio size={14} />
+        WiFi board UART ({pinName})
+      </div>
+      <p className="text-secondary">{role}</p>
+      <p className="text-dim">
+        Also wire GND ↔ GND and +3V3 → ESP 3.3V. Cross TX/RX — do not connect
+        TX to TX.
+      </p>
+      {otg && (
+        <p className="text-amber-500 flex items-start gap-1">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          OTG (+5V) is on — most ESP32 boards are 3.3V only; use +3V3 unless your
+          board explicitly needs 5V.
+        </p>
+      )}
+      <button
+        type="button"
+        className="text-accent hover:underline"
+        onClick={() => setActiveView("wifiboard")}
+      >
+        Open WiFi Board setup →
+      </button>
     </div>
   );
 }

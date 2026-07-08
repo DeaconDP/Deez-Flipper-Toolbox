@@ -56,3 +56,9 @@ Thumbs.db
 .agents/
 CLAUDE.md
 AGENTS.md
+
+# Cursor local debug / session artifacts
+.cursor/
+
+# Local FBT firmware clones (nested git repos)
+firmware/

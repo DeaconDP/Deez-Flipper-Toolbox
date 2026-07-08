@@ -436,7 +436,7 @@ pub fn cancel_transfer(state: State<AppState>) -> Result<()> {
 
 /// Sum the byte size of every file under `path`, recursively. Used as the
 /// denominator for whole-folder download progress.
-fn sum_tree_bytes(client: &mut FlipperClient, path: &str) -> Result<u64> {
+pub(crate) fn sum_tree_bytes(client: &mut FlipperClient, path: &str) -> Result<u64> {
     let mut total: u64 = 0;
     let mut queue: Vec<String> = vec![path.to_string()];
     while let Some(dir) = queue.pop() {
@@ -458,7 +458,7 @@ fn sum_tree_bytes(client: &mut FlipperClient, path: &str) -> Result<u64> {
 /// fully-resolved destination — directory contents land directly inside it,
 /// not under a wrapper folder. The wrapper is created by the caller so that
 /// behaviour is explicit at the command boundary.
-fn download_dir_recursive(
+pub(crate) fn download_dir_recursive(
     client: &mut FlipperClient,
     remote_dir: &str,
     local_dir: &Path,

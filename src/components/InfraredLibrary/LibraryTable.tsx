@@ -6,6 +6,7 @@ import {
   ArrowDown,
   Copy,
   Pencil,
+  Radio,
   Trash2,
   Check,
   X,
@@ -14,8 +15,16 @@ import { useFlipperStore } from "../../store/useFlipperStore";
 import { useExportDrag } from "../../hooks/useExportDrag";
 import { relativeDir, parentDir, nextDuplicateName } from "../../lib/path";
 import { formatMtime } from "../../lib/format";
-import { storageRead, storageRename, storageWrite, storageDelete } from "../../lib/tauri";
+import {
+  storageRead,
+  storageRename,
+  storageWrite,
+  storageDelete,
+  infraredTxStart,
+  infraredTxStop,
+} from "../../lib/tauri";
 import { saveInfraredCache } from "../../lib/infraredCache";
+import { confirmLibraryAction, stopAllLibrarySessions } from "../../lib/librarySessions";
 import { ContextMenu, type MenuItem } from "../ui/ContextMenu";
 import type { IrEntry } from "../../types/infrared";
 
@@ -112,7 +121,7 @@ export function LibraryTable({ entries }: Props) {
   );
 }
 
-const GRID_COLS = "grid-cols-[1fr_80px_200px_100px_130px]";
+const GRID_COLS = "grid-cols-[1fr_80px_200px_100px_170px]";
 
 function HeaderRow({
   sortKey,
@@ -177,10 +186,13 @@ function Row({
   const setError = useFlipperStore((s) => s.setIrError);
   const setEntries = useFlipperStore((s) => s.setIrEntries);
   const deviceUid = useFlipperStore((s) => s.deviceInfo?.hardware_uid ?? null);
+  const isConnected = useFlipperStore((s) => s.isConnected);
+  const transmittingPath = useFlipperStore((s) => s.irTransmittingPath);
+  const setTransmittingPath = useFlipperStore((s) => s.setIrTransmittingPath);
 
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
-  const [busy, setBusy] = useState<"rename" | "dup" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"rename" | "dup" | "delete" | "send" | null>(null);
 
   const relDir = relativeDir(entry.path, IR_ROOT);
   const protocolsLabel = summarizeProtocols(entry);
@@ -273,6 +285,45 @@ function Row({
       await persistList(allEntries.filter((e) => e.path !== entry.path));
     } catch (e) {
       setError(`Delete failed: ${(e as Error).message || String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const isSending = transmittingPath === entry.path;
+  const anySending = transmittingPath !== null;
+
+  const onToggleSend = async () => {
+    if (!isConnected) {
+      setError("Connect a Flipper to send.");
+      return;
+    }
+    if (isSending) {
+      setBusy("send");
+      try {
+        await infraredTxStop();
+        setTransmittingPath(null);
+      } catch (e) {
+        setError(`Stop send failed: ${(e as Error).message || String(e)}`);
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+    if (anySending) return;
+    const ok = await confirmLibraryAction(
+      "Send infrared signal",
+      `Send the first button from ${entry.name} via the Flipper IR blaster?`,
+    );
+    if (!ok) return;
+    setBusy("send");
+    try {
+      await stopAllLibrarySessions();
+      await infraredTxStart(entry.path);
+      setTransmittingPath(entry.path);
+    } catch (e) {
+      setError(`Send failed: ${(e as Error).message || String(e)}`);
+      setTransmittingPath(null);
     } finally {
       setBusy(null);
     }
@@ -385,6 +436,27 @@ function Row({
           className="p-1 text-muted hover:text-danger rounded transition-colors disabled:opacity-30"
         >
           <Trash2 size={13} />
+        </button>
+        <button
+          onClick={() => void onToggleSend()}
+          disabled={!isConnected || (anySending && !isSending) || busy !== null || renaming}
+          title={
+            !isConnected
+              ? "Connect a Flipper to send"
+              : isSending
+                ? "Stop (exit IR app on device)"
+                : anySending
+                  ? "Another remote is active"
+                  : "Send first button on Flipper"
+          }
+          className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+            isSending
+              ? "border-accent/50 bg-accent/15 text-accent"
+              : "border-border-subtle text-secondary hover:text-accent hover:border-accent/40"
+          }`}
+        >
+          <Radio size={10} />
+          {isSending ? "Stop" : "Send"}
         </button>
       </div>
     </div>

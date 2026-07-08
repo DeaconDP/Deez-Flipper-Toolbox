@@ -20,6 +20,12 @@ export type ActiveView =
   | "info"
   | "cli"
   | "screen"
+  | "backup"
+  | "firmware"
+  | "fbt"
+  | "editors"
+  | "devstudio"
+  | "wifiboard"
   | "settings";
 
 export type ConnectionKind = "serial" | "ble";
@@ -65,24 +71,32 @@ interface FlipperStore {
   irScanning: boolean;
   irProgress: IrScanProgress | null;
   irError: string | null;
+  /** Path of the .ir file currently being sent, or null when idle. */
+  irTransmittingPath: string | null;
 
   // NFC library
   nfcEntries: NfcEntry[];
   nfcScanning: boolean;
   nfcProgress: NfcScanProgress | null;
   nfcError: string | null;
+  /** Path of the .nfc file currently being emulated, or null when idle. */
+  nfcEmulatingPath: string | null;
 
   // RFID library (125 kHz)
   rfidEntries: RfidEntry[];
   rfidScanning: boolean;
   rfidProgress: RfidScanProgress | null;
   rfidError: string | null;
+  /** Path of the .rfid file currently being emulated, or null when idle. */
+  rfidEmulatingPath: string | null;
 
   // BadUSB library
   badusbEntries: BadUsbEntry[];
   badusbScanning: boolean;
   badusbProgress: BadUsbScanProgress | null;
   badusbError: string | null;
+  /** Path of the script currently running on the USB host, or null when idle. */
+  badusbRunningPath: string | null;
 
   // Pending search query injected by the GlobalSearch bar. Each library
   // component reads this on mount / when activeView matches and applies it to
@@ -125,18 +139,22 @@ interface FlipperStore {
   setIrScanning: (scanning: boolean) => void;
   setIrProgress: (progress: IrScanProgress | null) => void;
   setIrError: (error: string | null) => void;
+  setIrTransmittingPath: (path: string | null) => void;
   setNfcEntries: (entries: NfcEntry[]) => void;
   setNfcScanning: (scanning: boolean) => void;
   setNfcProgress: (progress: NfcScanProgress | null) => void;
   setNfcError: (error: string | null) => void;
+  setNfcEmulatingPath: (path: string | null) => void;
   setRfidEntries: (entries: RfidEntry[]) => void;
   setRfidScanning: (scanning: boolean) => void;
   setRfidProgress: (progress: RfidScanProgress | null) => void;
   setRfidError: (error: string | null) => void;
+  setRfidEmulatingPath: (path: string | null) => void;
   setBadUsbEntries: (entries: BadUsbEntry[]) => void;
   setBadUsbScanning: (scanning: boolean) => void;
   setBadUsbProgress: (progress: BadUsbScanProgress | null) => void;
   setBadUsbError: (error: string | null) => void;
+  setBadusbRunningPath: (path: string | null) => void;
   setAppEntries: (entries: AppEntry[]) => void;
   setAppsScanning: (scanning: boolean) => void;
   setAppsProgress: (progress: AppScanProgress | null) => void;
@@ -176,18 +194,22 @@ export const useFlipperStore = create<FlipperStore>((set) => ({
   irScanning: false,
   irProgress: null,
   irError: null,
+  irTransmittingPath: null,
   nfcEntries: [],
   nfcScanning: false,
   nfcProgress: null,
   nfcError: null,
+  nfcEmulatingPath: null,
   rfidEntries: [],
   rfidScanning: false,
   rfidProgress: null,
   rfidError: null,
+  rfidEmulatingPath: null,
   badusbEntries: [],
   badusbScanning: false,
   badusbProgress: null,
   badusbError: null,
+  badusbRunningPath: null,
   appEntries: [],
   appsScanning: false,
   appsProgress: null,
@@ -225,15 +247,19 @@ export const useFlipperStore = create<FlipperStore>((set) => ({
             irScanning: false,
             irProgress: null,
             irError: null,
+            irTransmittingPath: null,
             nfcScanning: false,
             nfcProgress: null,
             nfcError: null,
+            nfcEmulatingPath: null,
             rfidScanning: false,
             rfidProgress: null,
             rfidError: null,
+            rfidEmulatingPath: null,
             badusbScanning: false,
             badusbProgress: null,
             badusbError: null,
+            badusbRunningPath: null,
             appsScanning: false,
             appsProgress: null,
             appsError: null,
@@ -272,18 +298,22 @@ export const useFlipperStore = create<FlipperStore>((set) => ({
   setIrScanning: (irScanning) => set({ irScanning }),
   setIrProgress: (irProgress) => set({ irProgress }),
   setIrError: (irError) => set({ irError }),
+  setIrTransmittingPath: (irTransmittingPath) => set({ irTransmittingPath }),
   setNfcEntries: (nfcEntries) => set({ nfcEntries }),
   setNfcScanning: (nfcScanning) => set({ nfcScanning }),
   setNfcProgress: (nfcProgress) => set({ nfcProgress }),
   setNfcError: (nfcError) => set({ nfcError }),
+  setNfcEmulatingPath: (nfcEmulatingPath) => set({ nfcEmulatingPath }),
   setRfidEntries: (rfidEntries) => set({ rfidEntries }),
   setRfidScanning: (rfidScanning) => set({ rfidScanning }),
   setRfidProgress: (rfidProgress) => set({ rfidProgress }),
   setRfidError: (rfidError) => set({ rfidError }),
+  setRfidEmulatingPath: (rfidEmulatingPath) => set({ rfidEmulatingPath }),
   setBadUsbEntries: (badusbEntries) => set({ badusbEntries }),
   setBadUsbScanning: (badusbScanning) => set({ badusbScanning }),
   setBadUsbProgress: (badusbProgress) => set({ badusbProgress }),
   setBadUsbError: (badusbError) => set({ badusbError }),
+  setBadusbRunningPath: (badusbRunningPath) => set({ badusbRunningPath }),
   setAppEntries: (appEntries) => set({ appEntries }),
   setAppsScanning: (appsScanning) => set({ appsScanning }),
   setAppsProgress: (appsProgress) => set({ appsProgress }),

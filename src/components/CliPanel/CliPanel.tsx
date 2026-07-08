@@ -3,6 +3,8 @@ import { listen } from "@tauri-apps/api/event";
 import { Terminal as TerminalIcon } from "lucide-react";
 import { useFlipperStore } from "../../store/useFlipperStore";
 import { cliStart, cliSend, cliStop } from "../../lib/tauri";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { FeatureContextBar } from "../ui/FeatureContextBar";
 
 // Module-level promise tracking the in-flight CLI->RPC handover so RPC calls
 // (file browser, etc.) wait for it to finish instead of racing the mode switch.
@@ -151,6 +153,8 @@ export function CliPanel() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-app overflow-hidden">
+      <TutorialBanner topicId="cli" />
+      <FeatureContextBar topicId="cli" />
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border-subtle bg-panel/50 shrink-0">
         <TerminalIcon size={13} className="text-accent" />

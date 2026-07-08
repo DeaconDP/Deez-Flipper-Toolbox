@@ -5,11 +5,14 @@ import { useFlipperStore } from "../../store/useFlipperStore";
 import { badusbCancelScan, badusbScan } from "../../lib/tauri";
 import { loadSettings, subscribeSettings, updateSettings } from "../../lib/settings";
 import { useLibraryPreScan } from "../../hooks/useLibraryPreScan";
+import { useLibrarySessionCleanup } from "../../hooks/useLibrarySessionCleanup";
 import { loadBadUsbCache, saveBadUsbCache } from "../../lib/badusbCache";
 import { notify } from "../../lib/notify";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { LibraryTable } from "./LibraryTable";
 import { Spinner } from "../ui/Spinner";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { getLibraryEmptyHint } from "../../lib/tutorialContent";
 import type { BadUsbEntry, BadUsbScanProgress } from "../../types/badusb";
 
 const USB_ROOT = "/ext/badusb";
@@ -35,6 +38,7 @@ export function BadUsbLibrary() {
   const [cacheScannedAt, setCacheScannedAt] = useState<number | null>(null);
   const [previewEntry, setPreviewEntry] = useState<BadUsbEntry | null>(null);
   const { checkBeforeScan, modal: preScanModal } = useLibraryPreScan("badusb");
+  useLibrarySessionCleanup("badusb");
 
   useEffect(() => {
     loadSettings().then((s) => setExcludedDirs(s.badusb.excludedDirs));
@@ -148,6 +152,7 @@ export function BadUsbLibrary() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+      <TutorialBanner topicId="badusb" />
       <LibraryToolbar
         kinds={kinds}
         kindFilter={kindFilter}
@@ -216,7 +221,7 @@ function EmptyState({ onScan }: { onScan: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-dim">
       <Usb size={40} strokeWidth={1.5} className="text-elevated" />
-      <p className="text-sm">No BadUSB / BadKB scripts indexed yet.</p>
+      <p className="text-sm text-center max-w-sm">{getLibraryEmptyHint("badusb")}</p>
       <button
         onClick={onScan}
         className="px-3 py-1.5 text-xs text-primary bg-accent/20 border border-accent/40 rounded hover:bg-accent/30"

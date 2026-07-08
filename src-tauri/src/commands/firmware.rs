@@ -394,6 +394,148 @@ pub async fn firmware_flash(
     .map_err(|e| FlipperError::Internal(e.to_string()))?
 }
 
+/// Extract a local SD-card `.zip` update package and upload it to
+/// `/ext/update/` on the connected Flipper.
+#[tauri::command]
+pub async fn firmware_deploy_sd_zip(
+    local_path: String,
+    clean: bool,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<()> {
+    let client_mutex = Arc::clone(&state.client);
+    let mode_mutex = Arc::clone(&state.mode);
+    let generation = begin_transfer(&state.transfer_generation);
+    let cancelled_generation = Arc::clone(&state.transfer_cancelled_generation);
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let is_cancelled = || transfer_cancelled(&cancelled_generation, generation);
+
+        emit(
+            &app,
+            "prepare",
+            "info",
+            format!("Reading {}", short_name(&local_path)),
+            None,
+        );
+        let bundle = firmware::unpack_update_zip(std::path::Path::new(&local_path))?;
+        let dir = format!("/ext/update/{}", bundle.top_dir);
+        let manifest_path = format!("{dir}/{}", bundle.manifest_rel);
+        let total = bundle.total_bytes();
+        emit(
+            &app,
+            "prepare",
+            "ok",
+            format!("{} files · {}", bundle.files.len(), human_size(total)),
+            None,
+        );
+
+        if is_cancelled() {
+            return Err(FlipperError::TransferCancelled);
+        }
+
+        {
+            let conn_mode = mode_mutex.lock().unwrap();
+            if *conn_mode == ConnectionMode::Cli {
+                return Err(FlipperError::CliModeActive);
+            }
+        }
+        let mut guard = client_mutex.lock().unwrap();
+        let client = guard.as_mut().ok_or(FlipperError::NotConnected)?;
+
+        if clean {
+            emit(&app, "upload", "info", "Clearing /ext/update…", None);
+            let _ = storage::storage_delete(client, &dir, true);
+        }
+
+        ignore_already_exists(storage::storage_mkdir(client, "/ext/update"))?;
+        ignore_already_exists(storage::storage_mkdir(client, &dir))?;
+
+        let mut made_dirs: HashSet<String> = HashSet::new();
+        let mut done: u64 = 0;
+        let last_up_pct = Cell::new(-1i32);
+        for file in &bundle.files {
+            if is_cancelled() {
+                return Err(FlipperError::TransferCancelled);
+            }
+            ensure_parent_dirs(client, &dir, &file.rel_path, &mut made_dirs)?;
+            let remote = format!("{dir}/{}", file.rel_path);
+            emit(
+                &app,
+                "upload",
+                "info",
+                format!(
+                    "↑ {}  ({})",
+                    file.rel_path,
+                    human_size(file.data.len() as u64)
+                ),
+                Some(overall_pct(done, total)),
+            );
+            let start = done;
+            let app_up = app.clone();
+            storage::storage_write(
+                client,
+                &remote,
+                &file.data,
+                |sent, _| {
+                    let cur = start.saturating_add(sent as u64);
+                    let pct = overall_pct(cur, total) as i32;
+                    if pct != last_up_pct.get() {
+                        last_up_pct.set(pct);
+                        emit(&app_up, "upload", "info", "", Some(pct as u32));
+                    }
+                },
+                &is_cancelled,
+            )?;
+            done = done.saturating_add(file.data.len() as u64);
+        }
+        emit(
+            &app,
+            "done",
+            "ok",
+            format!(
+                "Staged at {manifest_path} — run Update on the Flipper (Settings → System → Update)."
+            ),
+            Some(100),
+        );
+        Ok(())
+    })
+    .await
+    .map_err(|e| FlipperError::Internal(e.to_string()))?
+}
+
 fn short_name(path: &str) -> String {
     path.rsplit(['/', '\\']).next().unwrap_or(path).to_string()
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn qflipper_run(
+    command: String,
+    args: Vec<String>,
+    qflipper_path: Option<String>,
+) -> Result<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let cli = crate::commands::tools::tools_resolve_qflipper(qflipper_path)
+            .ok_or_else(|| {
+                FlipperError::Internal("qFlipper-cli not found".into())
+            })?;
+        let mut cmd_args = vec![command.as_str()];
+        let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        cmd_args.extend(arg_refs);
+        let out = std::process::Command::new(&cli)
+            .args(&cmd_args)
+            .output()
+            .map_err(FlipperError::Io)?;
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        if out.status.success() {
+            Ok(format!("{stdout}{stderr}"))
+        } else {
+            Err(FlipperError::Internal(format!(
+                "qFlipper-cli failed: {stdout}{stderr}"
+            )))
+        }
+    })
+    .await
+    .map_err(|e| FlipperError::Internal(e.to_string()))?
 }

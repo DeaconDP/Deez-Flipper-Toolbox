@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use crate::error::{FlipperError, Result};
 use crate::flipper::ble::{connection::connect_ble, scanner};
+use crate::flipper::ports;
 use crate::flipper::session;
 use crate::flipper::transport::TransportKind;
 use crate::pb_system;
@@ -20,6 +21,22 @@ pub struct PortInfo {
     pub vid: Option<u16>,
     pub pid: Option<u16>,
     pub manufacturer: Option<String>,
+    /// False when the port is a stale/phantom entry (e.g. unplugged USB device).
+    #[serde(default = "default_available")]
+    pub available: bool,
+    /// True when this COM port is the Flipper's Bluetooth serial link (Windows SPP).
+    #[serde(default)]
+    pub is_flipper_bt: bool,
+    /// True when VID/manufacturer indicates a native Espressif USB device.
+    #[serde(default)]
+    pub is_espressif: bool,
+    /// True when this port may be Flipper WiFi dev board UART passthrough (Windows).
+    #[serde(default)]
+    pub is_devboard_passthrough: bool,
+}
+
+fn default_available() -> bool {
+    true
 }
 
 #[derive(Serialize, Deserialize)]
@@ -100,6 +117,79 @@ fn is_leap_year(year: u32) -> bool {
 /// random Bluetooth virtual ports, modems, or vendor serial dongles.
 const FLIPPER_USB_VID: u16 = 0x0483;
 const FLIPPER_USB_PID: u16 = 0x5740;
+/// Espressif native USB (some dev boards); many custom boards use CP210x/CH340 instead.
+const ESPRESSIF_USB_VID: u16 = 0x303A;
+
+fn is_espressif_vid(vid: Option<u16>, manufacturer: &Option<String>) -> bool {
+    if matches!(vid, Some(ESPRESSIF_USB_VID)) {
+        return true;
+    }
+    manufacturer
+        .as_ref()
+        .is_some_and(|m| m.to_lowercase().contains("espressif"))
+}
+
+fn is_flipper_vid_pid(vid: Option<u16>, pid: Option<u16>) -> bool {
+    matches!((vid, pid), (Some(FLIPPER_USB_VID), Some(FLIPPER_USB_PID)))
+}
+
+fn enrich_port_identity(
+    port_name: &str,
+    mut vid: Option<u16>,
+    mut pid: Option<u16>,
+    mut manufacturer: Option<String>,
+) -> (Option<u16>, Option<u16>, Option<String>, bool, bool, bool, bool) {
+    #[cfg(target_os = "windows")]
+    let is_flipper_bt = {
+        let id = ports::windows::com_port_identity(port_name);
+        id.is_flipper_bt
+    };
+    #[cfg(not(target_os = "windows"))]
+    let is_flipper_bt = false;
+
+    #[cfg(target_os = "windows")]
+    let pnp_id = ports::windows::com_port_pnp_id(port_name).unwrap_or_default();
+    #[cfg(not(target_os = "windows"))]
+    let pnp_id = String::new();
+
+    #[cfg(target_os = "windows")]
+    if vid.is_none() {
+        if let Some((v, p)) = ports::windows::com_port_usb_ids(port_name) {
+            vid = Some(v);
+            pid = Some(p);
+            if manufacturer.is_none() {
+                manufacturer = Some("STMicroelectronics".into());
+            }
+        }
+    }
+
+    let is_flipper = is_flipper_vid_pid(vid, pid)
+        || (cfg!(target_os = "macos") && port_name.to_lowercase().contains("usbmodemflip"));
+
+    if is_flipper_bt && manufacturer.is_none() {
+        manufacturer = Some("Flipper (Bluetooth)".into());
+    }
+
+    let is_espressif = is_espressif_vid(vid, &manufacturer);
+
+    let pnp_upper = pnp_id.to_ascii_uppercase();
+    let is_devboard_passthrough = is_flipper
+        && !is_flipper_bt
+        && (is_espressif
+            || pnp_upper.contains("CP210")
+            || pnp_upper.contains("SILABS")
+            || pnp_upper.contains("ESP32"));
+
+    (
+        vid,
+        pid,
+        manufacturer,
+        is_flipper,
+        is_flipper_bt,
+        is_espressif,
+        is_devboard_passthrough,
+    )
+}
 
 /// List serial ports, marking Flipper Zero ports via USB VID/PID. On macOS we
 /// additionally drop non-Flipper ports entirely (the `usbmodemflip*` naming
@@ -110,11 +200,27 @@ const FLIPPER_USB_PID: u16 = 0x5740;
 /// port can't trigger a connection retry loop.
 #[tauri::command]
 pub fn list_ports() -> Result<Vec<PortInfo>> {
+    list_ports_filtered(true)
+}
+
+/// Like [`list_ports`] but keeps non-Flipper ports on macOS too. Used by the
+/// WiFi Board ESP port picker and Marauder console.
+pub fn list_all_serial_ports() -> Result<Vec<PortInfo>> {
+    list_ports_filtered(false)
+}
+
+fn list_ports_filtered(hide_non_flipper_on_macos: bool) -> Result<Vec<PortInfo>> {
     // Note: list_ports is kept synchronous because serialport::available_ports()
     // is typically fast (~10-50ms). If this becomes a bottleneck, we can move it
     // to spawn_blocking later.
     let ports = serialport::available_ports()?;
-    Ok(ports
+    let live_names: std::collections::HashSet<String> =
+        ports.iter().map(|p| p.port_name.clone()).collect();
+
+    #[cfg(target_os = "windows")]
+    let registry_flipper = ports::windows::flipper_usb_com_ports();
+
+    let mut results: Vec<PortInfo> = ports
         .into_iter()
         .filter_map(|p| {
             let (vid, pid, manufacturer) = match &p.port_type {
@@ -123,20 +229,21 @@ pub fn list_ports() -> Result<Vec<PortInfo>> {
                 }
                 _ => (None, None, None),
             };
-            let is_flipper = matches!((vid, pid), (Some(FLIPPER_USB_VID), Some(FLIPPER_USB_PID)));
-
-            // Belt-and-braces fallback: some macOS USB stacks return the port
-            // without a populated VID/PID on first enumeration, so accept the
-            // historical name-based match as a fallback there.
-            let is_flipper = is_flipper
-                || (cfg!(target_os = "macos")
-                    && p.port_name.to_lowercase().contains("usbmodemflip"));
+            let (
+                vid,
+                pid,
+                manufacturer,
+                is_flipper,
+                is_flipper_bt,
+                is_espressif,
+                is_devboard_passthrough,
+            ) = enrich_port_identity(&p.port_name, vid, pid, manufacturer);
 
             // On macOS, hide non-Flipper ports outright to keep the picker
             // clean. On Windows / Linux we keep them visible but un-flipped
             // — the user can still see what's plugged in, but auto-connect
             // won't target them.
-            if cfg!(target_os = "macos") && !is_flipper {
+            if hide_non_flipper_on_macos && cfg!(target_os = "macos") && !is_flipper {
                 return None;
             }
 
@@ -146,9 +253,42 @@ pub fn list_ports() -> Result<Vec<PortInfo>> {
                 vid,
                 pid,
                 manufacturer,
+                available: true,
+                is_flipper_bt,
+                is_espressif,
+                is_devboard_passthrough,
             })
         })
-        .collect())
+        .collect();
+
+    // Windows: serialport often lists BT virtual COM ports without USB metadata,
+    // and may omit a ghost Flipper USB port entirely after unplug. Merge in any
+    // Flipper USB COM ports found via the registry so auto-connect can target
+    // the live port and we can surface stale entries with `available: false`.
+    #[cfg(target_os = "windows")]
+    {
+        let known: std::collections::HashSet<String> =
+            results.iter().map(|p| p.name.clone()).collect();
+        for (name, reg) in registry_flipper {
+            if known.contains(&name) {
+                continue;
+            }
+            let available = live_names.contains(&name);
+            results.push(PortInfo {
+                name,
+                is_flipper: true,
+                vid: Some(reg.vid),
+                pid: Some(reg.pid),
+                manufacturer: reg.manufacturer,
+                available,
+                is_flipper_bt: false,
+                is_espressif: false,
+                is_devboard_passthrough: false,
+            });
+        }
+    }
+
+    Ok(results)
 }
 
 /// Open a connection to the Flipper Zero on the given port.

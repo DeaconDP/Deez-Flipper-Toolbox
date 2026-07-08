@@ -1,7 +1,8 @@
-import { RefreshCw, Search, X, RadioTower, Star } from "lucide-react";
+import { RefreshCw, Search, X, RadioTower, Star, Radio } from "lucide-react";
 import { useFlipperStore } from "../../store/useFlipperStore";
 import { ScanProgressBar } from "../ui/ScanProgressBar";
 import { formatRelative } from "../../lib/format";
+import { FeatureContextBar } from "../ui/FeatureContextBar";
 
 interface Props {
   protocols: string[];
@@ -91,6 +92,8 @@ export function LibraryToolbar({
         )}
       </div>
 
+      <FeatureContextBar topicId="subghz" />
+
       <div className="flex items-center gap-2 px-3 pb-2">
         <div className="relative flex-1 max-w-xs">
           <Search
@@ -140,6 +143,12 @@ export function LibraryToolbar({
       </div>
 
       {scanning && progress && <ScanProgressBar progress={progress} />}
+      {transmitting && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-danger/10 border-t border-danger/30 text-[11px] text-danger">
+          <Radio size={12} className="animate-pulse" />
+          <span className="flex-1 truncate">Transmitting {transmitting.split("/").pop()}</span>
+        </div>
+      )}
     </header>
   );
 }

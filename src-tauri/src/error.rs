@@ -43,6 +43,12 @@ pub enum FlipperError {
     #[error("Transfer cancelled")]
     TransferCancelled,
 
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("Zip error: {0}")]
+    Zip(#[from] zip::result::ZipError),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

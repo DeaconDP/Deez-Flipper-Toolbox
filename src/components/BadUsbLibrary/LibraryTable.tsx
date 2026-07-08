@@ -9,6 +9,7 @@ import {
   Download,
   FilePenLine,
   Pencil,
+  Play,
   Trash2,
   Check,
   X,
@@ -19,8 +20,11 @@ import {
   storageRead,
   storageRename,
   storageWrite,
+  badusbRunStart,
+  badusbRunStop,
 } from "../../lib/tauri";
 import { saveBadUsbCache } from "../../lib/badusbCache";
+import { confirmLibraryAction, stopAllLibrarySessions } from "../../lib/librarySessions";
 import { useExportDrag } from "../../hooks/useExportDrag";
 import { relativeDir, parentDir, nextDuplicateName } from "../../lib/path";
 import { formatSize, formatMtime } from "../../lib/format";
@@ -191,10 +195,15 @@ function Row({
   const setError = useFlipperStore((s) => s.setBadUsbError);
   const setEntries = useFlipperStore((s) => s.setBadUsbEntries);
   const deviceUid = useFlipperStore((s) => s.deviceInfo?.hardware_uid ?? null);
+  const isConnected = useFlipperStore((s) => s.isConnected);
+  const runningPath = useFlipperStore((s) => s.badusbRunningPath);
+  const setRunningPath = useFlipperStore((s) => s.setBadusbRunningPath);
 
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
-  const [busy, setBusy] = useState<"rename" | "dup" | "delete" | "download" | null>(null);
+  const [busy, setBusy] = useState<
+    "rename" | "dup" | "delete" | "download" | "run" | null
+  >(null);
 
   const kindRoot = entry.kind === "kb" ? "/ext/badkb" : "/ext/badusb";
   const relDir = relativeDir(entry.path, kindRoot);
@@ -302,6 +311,45 @@ function Row({
       await persistList(allEntries.filter((e) => e.path !== entry.path));
     } catch (e) {
       setError(`Delete failed: ${(e as Error).message || String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const isRunning = runningPath === entry.path;
+  const anyRunning = runningPath !== null;
+
+  const onToggleRun = async () => {
+    if (!isConnected) {
+      setError("Connect a Flipper to run scripts.");
+      return;
+    }
+    if (isRunning) {
+      setBusy("run");
+      try {
+        await badusbRunStop();
+        setRunningPath(null);
+      } catch (e) {
+        setError(`Stop failed: ${(e as Error).message || String(e)}`);
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+    if (anyRunning) return;
+    const ok = await confirmLibraryAction(
+      "Run BadUSB script",
+      `Run ${entry.name} on the USB-attached host?\n\nThis injects keystrokes into whatever PC the Flipper is plugged into.`,
+    );
+    if (!ok) return;
+    setBusy("run");
+    try {
+      await stopAllLibrarySessions();
+      await badusbRunStart(entry.path);
+      setRunningPath(entry.path);
+    } catch (e) {
+      setError(`Run failed: ${(e as Error).message || String(e)}`);
+      setRunningPath(null);
     } finally {
       setBusy(null);
     }
@@ -463,6 +511,30 @@ function Row({
           className="p-1 text-muted hover:text-danger rounded transition-colors disabled:opacity-30"
         >
           <Trash2 size={13} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            void onToggleRun();
+          }}
+          disabled={!isConnected || (anyRunning && !isRunning) || busy !== null || renaming}
+          title={
+            !isConnected
+              ? "Connect a Flipper to run"
+              : isRunning
+                ? "Stop script"
+                : anyRunning
+                  ? "Another script is running"
+                  : "Run on USB host"
+          }
+          className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+            isRunning
+              ? "border-danger/50 bg-danger/15 text-danger animate-pulse"
+              : "border-border-subtle text-secondary hover:text-accent hover:border-accent/40"
+          }`}
+        >
+          <Play size={10} />
+          {isRunning ? "Stop" : "Run"}
         </button>
       </div>
     </div>

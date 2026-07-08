@@ -217,7 +217,7 @@ pub fn fetch_catalog(provider_id: &str, directory_url: &str) -> Result<FirmwareC
 fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(20))
-        .user_agent(concat!("FlipperUI/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("DeezFlipperTools/", env!("CARGO_PKG_VERSION")))
         .build()
 }
 
@@ -385,6 +385,81 @@ pub fn unpack_update_archive(bytes: &[u8]) -> Result<UpdateBundle> {
     }
     let manifest_rel = manifest_rel.ok_or_else(|| {
         FlipperError::Internal(format!("update bundle is missing {MANIFEST_NAME}"))
+    })?;
+
+    Ok(UpdateBundle {
+        top_dir: top_dir.unwrap_or_else(|| "update".to_string()),
+        manifest_rel,
+        files,
+    })
+}
+
+/// Unpack an SD-card `.zip` update package. If the archive contains a single
+/// `.tgz`/`.tar` entry it is unpacked via [`unpack_update_archive`]; otherwise
+/// the zip entries are read directly (same layout as a tar bundle).
+pub fn unpack_update_zip(path: &std::path::Path) -> Result<UpdateBundle> {
+    use std::io::Read;
+
+    let file = std::fs::File::open(path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    // If the zip wraps a single update archive, delegate to the tar path.
+    if archive.len() == 1 {
+        let mut entry = archive.by_index(0)?;
+        let name = entry.name().to_string();
+        if name.ends_with(".tgz") || name.ends_with(".tar") {
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes)?;
+            return unpack_update_archive(&bytes);
+        }
+    }
+
+    let mut top_dir: Option<String> = None;
+    let mut files: Vec<BundleFile> = Vec::new();
+    let mut manifest_rel: Option<String> = None;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)?;
+        if entry.is_dir() {
+            continue;
+        }
+        let path = entry.name().replace('\\', "/");
+        let mut comps = path.splitn(2, '/');
+        let first = comps.next().unwrap_or_default().to_string();
+        let rest = comps.next().map(|s| s.to_string());
+
+        let rel = match rest {
+            Some(r) if !r.is_empty() => {
+                match &top_dir {
+                    Some(d) if *d != first => {
+                        return Err(FlipperError::Internal(
+                            "update zip has multiple top-level directories".into(),
+                        ));
+                    }
+                    None => top_dir = Some(first.clone()),
+                    _ => {}
+                }
+                r
+            }
+            _ => first,
+        };
+
+        let mut data = Vec::new();
+        entry
+            .read_to_end(&mut data)
+            .map_err(|e| FlipperError::Internal(format!("read error in update zip: {e}")))?;
+
+        if rel == MANIFEST_NAME || rel.ends_with(&format!("/{MANIFEST_NAME}")) {
+            manifest_rel = Some(rel.clone());
+        }
+        files.push(BundleFile { rel_path: rel, data });
+    }
+
+    if files.is_empty() {
+        return Err(FlipperError::Internal("update zip is empty".into()));
+    }
+    let manifest_rel = manifest_rel.ok_or_else(|| {
+        FlipperError::Internal(format!("update zip is missing {MANIFEST_NAME}"))
     })?;
 
     Ok(UpdateBundle {

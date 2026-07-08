@@ -5,10 +5,13 @@ import { useFlipperStore } from "../../store/useFlipperStore";
 import { infraredCancelScan, infraredScan } from "../../lib/tauri";
 import { loadSettings, subscribeSettings, updateSettings } from "../../lib/settings";
 import { useLibraryPreScan } from "../../hooks/useLibraryPreScan";
+import { useLibrarySessionCleanup } from "../../hooks/useLibrarySessionCleanup";
 import { loadInfraredCache, saveInfraredCache } from "../../lib/infraredCache";
 import { notify } from "../../lib/notify";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { LibraryTable } from "./LibraryTable";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { getLibraryEmptyHint } from "../../lib/tutorialContent";
 import type { IrScanProgress } from "../../types/infrared";
 
 const IR_ROOT = "/ext/infrared";
@@ -29,6 +32,7 @@ export function InfraredLibrary() {
   const [protocolFilter, setProtocolFilter] = useState<string | null>(null);
   const [cacheScannedAt, setCacheScannedAt] = useState<number | null>(null);
   const { checkBeforeScan, modal: preScanModal } = useLibraryPreScan("infrared");
+  useLibrarySessionCleanup("infrared");
 
   useEffect(() => {
     loadSettings().then((s) => setExcludedDirs(s.infrared.excludedDirs));
@@ -149,6 +153,7 @@ export function InfraredLibrary() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <TutorialBanner topicId="infrared" />
       <LibraryToolbar
         protocols={protocols}
         protocolFilter={protocolFilter}
@@ -189,7 +194,7 @@ function EmptyState({ onScan }: { onScan: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-dim">
       <Tv size={40} strokeWidth={1.5} className="text-elevated" />
-      <p className="text-sm">No .ir files indexed yet.</p>
+      <p className="text-sm text-center max-w-sm">{getLibraryEmptyHint("infrared")}</p>
       <button
         onClick={onScan}
         className="px-3 py-1.5 text-xs text-primary bg-accent/20 border border-accent/40 rounded hover:bg-accent/30"

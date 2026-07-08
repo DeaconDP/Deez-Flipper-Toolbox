@@ -6,12 +6,15 @@ import { useFlipperStore } from "../../store/useFlipperStore";
 import { rfidCancelScan, rfidParsePaths, rfidScan } from "../../lib/tauri";
 import { loadSettings, subscribeSettings, updateSettings } from "../../lib/settings";
 import { useLibraryPreScan } from "../../hooks/useLibraryPreScan";
+import { useLibrarySessionCleanup } from "../../hooks/useLibrarySessionCleanup";
 import { loadRfidCache, saveRfidCache } from "../../lib/rfidCache";
 import { notify } from "../../lib/notify";
 import { useLibraryDrop } from "../../hooks/useLibraryDrop";
 import { LibraryDropOverlay } from "../ui/LibraryDropOverlay";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { LibraryTable } from "./LibraryTable";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { getLibraryEmptyHint } from "../../lib/tutorialContent";
 import type { RfidScanProgress } from "../../types/rfid";
 
 const RFID_ROOT = "/ext/lfrfid";
@@ -32,6 +35,7 @@ export function RfidLibrary() {
   const [keyTypeFilter, setKeyTypeFilter] = useState<string | null>(null);
   const [cacheScannedAt, setCacheScannedAt] = useState<number | null>(null);
   const { checkBeforeScan, modal: preScanModal } = useLibraryPreScan("rfid");
+  useLibrarySessionCleanup("rfid");
 
   useEffect(() => {
     loadSettings().then((s) => setExcludedDirs(s.rfid.excludedDirs));
@@ -185,6 +189,7 @@ export function RfidLibrary() {
       className="flex-1 min-h-0 flex flex-col overflow-hidden relative"
       {...dropZoneHandlers}
     >
+      <TutorialBanner topicId="rfid" />
       <LibraryToolbar
         keyTypes={keyTypes}
         keyTypeFilter={keyTypeFilter}
@@ -232,7 +237,7 @@ function EmptyState({ onScan }: { onScan: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-dim">
       <img src={rfidIconSvg} alt="RFID" className="w-10 h-10 text-elevated" />
-      <p className="text-sm">No .rfid files indexed yet.</p>
+      <p className="text-sm text-center max-w-sm">{getLibraryEmptyHint("rfid")}</p>
       <button
         onClick={onScan}
         className="px-3 py-1.5 text-xs text-primary bg-accent/20 border border-accent/40 rounded hover:bg-accent/30"

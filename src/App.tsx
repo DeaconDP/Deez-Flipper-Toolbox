@@ -23,9 +23,20 @@ import { loadSettings, subscribeSettings } from "./lib/settings";
 import { applyAccentColor } from "./lib/theme";
 import { syncClockOnConnectIfEnabled } from "./lib/clockSync";
 import { notify } from "./lib/notify";
+import { stopAllLibrarySessions } from "./lib/librarySessions";
 import { usePreloadLibraries } from "./hooks/usePreloadLibraries";
 import flipperOutlineUrl from "./assets/flipper-outline.svg";
+import { BackupView } from "./components/Backup/BackupView";
+import { FirmwareView } from "./components/Firmware/FirmwareView";
+import { FbtStudioView } from "./components/FbtStudio/FbtStudioView";
+import { EditorsView } from "./components/Editors/EditorsView";
+import { DevStudioView } from "./components/DevStudio/DevStudioView";
+import { WifiBoardView } from "./components/WifiBoard/WifiBoardView";
+import { SetupWizard } from "./components/SetupWizard/SetupWizard";
 import { ErrorBanner } from "./components/ui/ErrorBanner";
+import { TutorialToggle } from "./components/Tutorial/TutorialToggle";
+import { TutorialBanner } from "./components/Tutorial/TutorialBanner";
+import { FeatureContextBar } from "./components/ui/FeatureContextBar";
 
 export default function App() {
   const activeView = useFlipperStore((s) => s.activeView);
@@ -152,6 +163,7 @@ export default function App() {
     };
 
     listen<string>("flipper-disconnected", async (event) => {
+      await stopAllLibrarySessions().catch(() => {});
       setConnected(null);
       void notify("deviceDisconnected", "Flipper disconnected", event.payload);
       cancel();
@@ -216,6 +228,8 @@ export default function App() {
         <ActivePane activeView={activeView} isConnected={isConnected} />
       </div>
       <CommandPalette />
+      <SetupWizard />
+      <TutorialToggle />
     </div>
   );
 }
@@ -259,6 +273,13 @@ function ActivePane({
     return <BadUsbLibrary />;
   }
 
+  if (activeView === "backup") return <BackupView />;
+  if (activeView === "firmware") return <FirmwareView />;
+  if (activeView === "fbt") return <FbtStudioView />;
+  if (activeView === "editors") return <EditorsView />;
+  if (activeView === "devstudio") return <DevStudioView />;
+  if (activeView === "wifiboard") return <WifiBoardView />;
+
   if (!isConnected) {
     return <DisconnectedEmptyState />;
   }
@@ -278,7 +299,10 @@ function ActivePane({
 
 function DisconnectedEmptyState() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-4 text-dim">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <TutorialBanner topicId="disconnected" />
+      <FeatureContextBar topicId="disconnected" />
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 text-dim">
       <div
         aria-hidden
         className="text-elevated"
@@ -297,6 +321,7 @@ function DisconnectedEmptyState() {
         }}
       />
       <p className="text-sm">Connect a Flipper Zero to get started</p>
+      </div>
     </div>
   );
 }

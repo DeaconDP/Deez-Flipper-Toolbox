@@ -23,6 +23,8 @@ import {
   type HeaderPin,
 } from "../../types/gpio";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { FeatureContextBar } from "../ui/FeatureContextBar";
 import flipperOutlineUrl from "../../assets/flipper-outline.svg";
 import { GpioTopBar } from "./GpioTopBar";
 import { PinColumn } from "./PinColumn";
@@ -469,6 +471,8 @@ export function GpioView() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <TutorialBanner topicId="gpio" />
+      <FeatureContextBar topicId="gpio" />
       <GpioTopBar
         otg={otg}
         busy={busy}
@@ -587,6 +591,7 @@ function DetailPaneSwitch({
         value={state.value}
         pull={state.pull}
         watching={state.watching}
+        otg={otg}
         samples={samplesRef.current[name]}
         lastAction={state.lastAction}
         lastActionAt={state.lastActionAt}

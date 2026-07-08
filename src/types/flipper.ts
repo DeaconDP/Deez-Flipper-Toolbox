@@ -6,6 +6,12 @@ export interface PortInfo {
   vid: number | null;
   pid: number | null;
   manufacturer: string | null;
+  /** False for stale/phantom ports (e.g. unplugged USB device still in registry). */
+  available?: boolean;
+  /** Windows Bluetooth SPP link to a paired Flipper — not the USB RPC port. */
+  is_flipper_bt?: boolean;
+  /** Native Espressif USB device (VID 0x303A). */
+  is_espressif?: boolean;
 }
 
 export interface DeviceInfo {

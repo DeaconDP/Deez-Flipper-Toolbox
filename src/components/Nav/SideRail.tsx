@@ -1,12 +1,20 @@
 import {
   FolderTree,
+  HardDriveDownload,
+  Hammer,
   Home,
+  Info,
   Menu,
   Monitor,
-  Terminal
+  Pencil,
+  Terminal,
+  Cpu,
+  Code2,
+  Radio,
 } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import { useFlipperStore, type ActiveView } from "../../store/useFlipperStore";
+import { getTutorialTopic } from "../../lib/tutorialContent";
 import { FlipperSvgIcon } from "../ui/FlipperSvgIcon";
 import subghzIconSvg from "../../assets/icons/sub1.svg?raw";
 import infraredIconSvg from "../../assets/icons/infrared.svg?raw";
@@ -16,7 +24,6 @@ import pluginsIconSvg from "../../assets/icons/plugins.svg?raw";
 import settingsIconSvg from "../../assets/icons/settings.svg?raw";
 import badusbIconSvg from "../../assets/icons/badusb.svg?raw";
 import gpioIconSvg from "../../assets/icons/gpio.svg?raw";
-//import archiveIconSvg from "../../assets/icons/archive.svg?raw";
 
 type RailIconProps = { size?: number; strokeWidth?: number };
 
@@ -29,6 +36,7 @@ const flipperIcon = (svg: string, name: string): ComponentType<RailIconProps> =>
 interface RailItem {
   view: ActiveView;
   label: string;
+  topicId?: string;
   Icon: ComponentType<RailIconProps>;
   /** Disabled while no device is connected. */
   requiresConnection?: boolean;
@@ -42,23 +50,47 @@ interface RailItem {
 }
 
 const TOP_ITEMS: RailItem[] = [
-  { view: "dashboard", label: "Dashboard", Icon: Home },
-  { view: "files", label: "File Explorer", Icon: FolderTree, requiresConnection: true },
-  { view: "apps", label: "Apps", Icon: flipperIcon(pluginsIconSvg, "plugins"), requiresConnection: true },
-  { view: "subghz", label: "Sub-GHz", Icon: flipperIcon(subghzIconSvg, "subghz"), requiresConnection: true, browsableOffline: "subghz" },
-  { view: "infrared", label: "Infrared", Icon: flipperIcon(infraredIconSvg, "infrared"), requiresConnection: true, browsableOffline: "infrared" },
-  { view: "nfc", label: "NFC", Icon: flipperIcon(nfcIconSvg, "nfc"), requiresConnection: true, browsableOffline: "nfc" },
-  { view: "rfid", label: "RFID", Icon: flipperIcon(rfidIconSvg, "rfid"), requiresConnection: true, browsableOffline: "rfid" },
-  { view: "badusb", label: "BadUSB", Icon: flipperIcon(badusbIconSvg, "badusb"), requiresConnection: true, browsableOffline: "badusb" },
-  { view: "gpio", label: "GPIO", Icon: flipperIcon(gpioIconSvg, "gpio"), requiresConnection: true },
-  { view: "screen", label: "Screen", Icon: Monitor, requiresConnection: true },
-  { view: "cli", label: "Terminal", Icon: Terminal, requiresConnection: true, disabledOnBle: true },
-  
+  { view: "dashboard", label: "Dashboard", topicId: "dashboard", Icon: Home },
+  { view: "files", label: "File Explorer", topicId: "files", Icon: FolderTree, requiresConnection: true },
+  { view: "apps", label: "Apps", topicId: "apps", Icon: flipperIcon(pluginsIconSvg, "plugins"), requiresConnection: true },
+  { view: "subghz", label: "Sub-GHz", topicId: "subghz", Icon: flipperIcon(subghzIconSvg, "subghz"), requiresConnection: true, browsableOffline: "subghz" },
+  { view: "infrared", label: "Infrared", topicId: "infrared", Icon: flipperIcon(infraredIconSvg, "infrared"), requiresConnection: true, browsableOffline: "infrared" },
+  { view: "nfc", label: "NFC", topicId: "nfc", Icon: flipperIcon(nfcIconSvg, "nfc"), requiresConnection: true, browsableOffline: "nfc" },
+  { view: "rfid", label: "RFID (125 kHz)", topicId: "rfid", Icon: flipperIcon(rfidIconSvg, "rfid"), requiresConnection: true, browsableOffline: "rfid" },
+  { view: "badusb", label: "BadUSB", topicId: "badusb", Icon: flipperIcon(badusbIconSvg, "badusb"), requiresConnection: true, browsableOffline: "badusb" },
+  { view: "backup", label: "Backup", topicId: "backup", Icon: HardDriveDownload, requiresConnection: true },
+  { view: "firmware", label: "Firmware", topicId: "firmware", Icon: Cpu },
+  { view: "fbt", label: "FBT Studio", topicId: "fbt", Icon: Hammer },
+  { view: "editors", label: "Editors", topicId: "editors", Icon: Pencil },
+  { view: "devstudio", label: "Dev Studio", topicId: "devstudio", Icon: Code2 },
+  { view: "wifiboard", label: "WiFi Board", topicId: "wifiboard", Icon: Radio },
+  { view: "gpio", label: "GPIO", topicId: "gpio", Icon: flipperIcon(gpioIconSvg, "gpio"), requiresConnection: true },
+  { view: "info", label: "Device Info", topicId: "info", Icon: Info, requiresConnection: true },
+  { view: "screen", label: "Screen mirror", topicId: "screen", Icon: Monitor, requiresConnection: true },
+  { view: "cli", label: "Terminal", topicId: "cli", Icon: Terminal, requiresConnection: true, disabledOnBle: true },
 ];
 
 const BOTTOM_ITEMS: RailItem[] = [
-  { view: "settings", label: "Settings", Icon: flipperIcon(settingsIconSvg, "settings") },
+  { view: "settings", label: "Settings", topicId: "settings", Icon: flipperIcon(settingsIconSvg, "settings") },
 ];
+
+function railTooltip(
+  item: RailItem,
+  disabled: boolean,
+  isConnected: boolean,
+  connectionKind: "serial" | "ble" | null,
+): string {
+  if (disabled) {
+    if (item.disabledOnBle && connectionKind === "ble") {
+      return "Terminal needs a USB cable";
+    }
+    if (item.requiresConnection && !isConnected) {
+      return "Connect your Flipper to use this";
+    }
+  }
+  const topic = item.topicId ? getTutorialTopic(item.topicId) : undefined;
+  return topic?.tagline ?? item.label;
+}
 
 export function SideRail() {
   const activeView = useFlipperStore((s) => s.activeView);
@@ -94,6 +126,7 @@ export function SideRail() {
 
   const renderItem = (item: RailItem) => {
     const disabled = itemDisabled(item);
+    const tooltip = railTooltip(item, disabled, isConnected, connectionKind);
     return (
       <RailButton
         key={item.view}
@@ -101,6 +134,7 @@ export function SideRail() {
         active={activeView === item.view}
         disabled={disabled}
         expanded={expanded}
+        tooltip={tooltip}
         onClick={() => {
           if (!disabled) setActiveView(item.view);
         }}
@@ -152,12 +186,14 @@ function RailButton({
   active,
   disabled,
   expanded,
+  tooltip,
   onClick,
 }: {
   item: RailItem;
   active: boolean;
   disabled: boolean;
   expanded: boolean;
+  tooltip: string;
   onClick: () => void;
 }) {
   const { Icon, label } = item;
@@ -173,7 +209,7 @@ function RailButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={label}
+      title={tooltip}
       aria-label={label}
       aria-current={active && !disabled ? "page" : undefined}
       className={[

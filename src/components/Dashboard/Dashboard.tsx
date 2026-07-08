@@ -8,6 +8,7 @@ import {
   HardDriveDownload,
   Home,
   Info,
+  Radio,
   RefreshCw,
   Thermometer,
   Usb,
@@ -15,14 +16,21 @@ import {
 } from "lucide-react";
 import { useFlipperStore } from "../../store/useFlipperStore";
 import { powerInfo, storageDu, storageInfo } from "../../lib/tauri";
+import { loadSettings } from "../../lib/settings";
+import { wifiBoardDetectTools, wifiBoardFieldStatus } from "../../lib/wifiBoard";
 import { FlipperSvgIcon } from "../ui/FlipperSvgIcon";
 import { DeviceSettingsCard } from "../DeviceSettings/DeviceSettingsCard";
 import { FirmwareFlashModal } from "../FirmwareFlash/FirmwareFlashModal";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { FeatureContextBar } from "../ui/FeatureContextBar";
+import {
+  BUILTIN_CAPABILITIES,
+  CONNECTION_HINTS,
+  getTutorialTopic,
+} from "../../lib/tutorialContent";
 import type { StorageInfo as StorageInfoType } from "../../types/flipper";
 
-import blackFlipper from "../../assets/flipper-zero/FZBlackNormal.svg";
-import whiteFlipper from "../../assets/flipper-zero/FZWhiteNormal.svg";
-import transparentFlipper from "../../assets/flipper-zero/FZClearNormal.svg";
+import flipperDashboardImg from "../../assets/flipper-zero/flipper-dashboard.png";
 
 import subghzIconSvg from "../../assets/icons/sub1.svg?raw";
 import infraredIconSvg from "../../assets/icons/infrared.svg?raw";
@@ -30,12 +38,6 @@ import nfcIconSvg from "../../assets/icons/nfc.svg?raw";
 import rfidIconSvg from "../../assets/icons/125.svg?raw";
 import badusbIconSvg from "../../assets/icons/badusb.svg?raw";
 import pluginsIconSvg from "../../assets/icons/plugins.svg?raw";
-
-const flipperVariants: Record<string, string> = {
-  "1": blackFlipper,
-  "2": whiteFlipper,
-  "3": transparentFlipper,
-};
 
 const REFRESH_INTERVAL_MS = 30_000;
 
@@ -57,7 +59,30 @@ export function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null);
   const [showFirmware, setShowFirmware] = useState(false);
+  const [showWifiBoardHint, setShowWifiBoardHint] = useState(false);
+  const [wifiFieldReady, setWifiFieldReady] = useState(false);
   const inflight = useRef(false);
+
+  useEffect(() => {
+    void (async () => {
+      const settings = await loadSettings();
+      const tools = await wifiBoardDetectTools(settings.tools.esptoolPath);
+      const hasPriorSetup =
+        Boolean(settings.wifiBoard.lastProfile) ||
+        Boolean(settings.wifiBoard.lastEspPort);
+      setShowWifiBoardHint(!tools.esptool.found || hasPriorSetup);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!isConnected) {
+      setWifiFieldReady(false);
+      return;
+    }
+    void wifiBoardFieldStatus()
+      .then((s) => setWifiFieldReady(s.companion_on_sd === true))
+      .catch(() => setWifiFieldReady(false));
+  }, [isConnected]);
 
   const refresh = useCallback(async () => {
     if (inflight.current) return;
@@ -101,13 +126,6 @@ export function Dashboard() {
     return () => window.clearInterval(id);
   }, [isConnected, refresh]);
 
-  const hardwareColor = deviceInfo?.hardware_name?.includes("Black")
-    ? "1"
-    : deviceInfo?.hardware_name?.includes("White")
-      ? "2"
-      : "3";
-  const flipperImg = flipperVariants[hardwareColor] ?? whiteFlipper;
-
   // Firmware flashing is USB-only for now. Flashing over BLE is technically
   // possible but the multi-MB upload at BLE's small chunk size would be
   // painfully slow, so we deliberately gate the tool to a serial connection.
@@ -120,6 +138,8 @@ export function Dashboard() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <TutorialBanner topicId="dashboard" />
+      <FeatureContextBar topicId="dashboard" />
       <header className="shrink-0 border-b border-border-subtle bg-panel">
         <div className="flex items-center gap-2 px-3 py-2">
           <Home size={14} className="text-accent" />
@@ -150,7 +170,7 @@ export function Dashboard() {
           {/* Hero */}
           <section className="relative flex flex-col sm:flex-row items-center sm:items-stretch gap-5 px-4 py-4 bg-panel/60 border border-border-subtle rounded-lg">
             <img
-              src={flipperImg}
+              src={flipperDashboardImg}
               alt="Flipper Zero"
               className="w-44 max-w-full h-auto select-none"
               draggable={false}
@@ -207,15 +227,38 @@ export function Dashboard() {
                 type="button"
                 onClick={() => setActiveView("info")}
                 disabled={!isConnected}
-                title="Detailed view"
-                aria-label="Open device info detailed view"
+                title="Open device info"
+                aria-label="Open device info"
                 className="flex items-center gap-1.5 px-2 py-1 text-[11px] text-muted hover:text-primary border border-border-subtle rounded hover:bg-surface/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <Info size={12} />
-                Detailed view
+                Device info
               </button>
             </div>
           </section>
+
+          {showWifiBoardHint && (
+            <section className="px-4 py-3 bg-panel/60 border border-border-subtle rounded-lg flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Radio size={16} className="text-accent shrink-0" />
+                <div>
+                  <h3 className="text-sm font-semibold text-primary">WiFi Board</h3>
+                  <p className="text-xs text-muted">
+                    {wifiFieldReady
+                      ? "Companion FAP is on SD — open the Field tab to launch and operate."
+                      : "Flash ESP32 Marauder, deploy the companion FAP, or open the desktop console."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveView("wifiboard")}
+                className="text-xs px-3 py-1.5 rounded bg-accent-dim hover:bg-accent-hover text-white shrink-0"
+              >
+                {wifiFieldReady ? "Open Field tab" : "Open WiFi Board"}
+              </button>
+            </section>
+          )}
 
           {/* Stat cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -230,13 +273,41 @@ export function Dashboard() {
 
           {/* Library stats */}
           <section className="px-4 py-4 bg-panel/60 border border-border-subtle rounded-lg">
-            <h3 className="text-sm font-semibold text-primary mb-3 flex items-center gap-1.5">
-              <Zap size={14} className="text-accent" />
-              Libraries
-            </h3>
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-1.5">
+                <Zap size={14} className="text-accent" />
+                Built-in radios
+              </h3>
+              <p className="text-[11px] text-muted mt-0.5">
+                What your Flipper can do out of the box — hover for examples
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {BUILTIN_CAPABILITIES.map(({ topicId, label, view }) => {
+                const tagline = getTutorialTopic(topicId)?.tagline;
+                return (
+                  <button
+                    key={topicId}
+                    type="button"
+                    onClick={() => setActiveView(view)}
+                    title={tagline}
+                    className="text-[11px] px-2.5 py-1 rounded border border-border-subtle text-secondary hover:text-primary hover:bg-surface/60 transition-colors"
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mb-3">
+              <h4 className="text-xs font-medium text-primary">Saved on SD card</h4>
+              <p className="text-[11px] text-muted mt-0.5">
+                Files you&apos;ve recorded or copied — scan each library to update counts
+              </p>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               <LibraryStat
                 label="Sub-GHz"
+                topicId="subghz"
                 count={subghzCount}
                 svg={subghzIconSvg}
                 onClick={() => setActiveView("subghz")}
@@ -244,6 +315,7 @@ export function Dashboard() {
               />
               <LibraryStat
                 label="Infrared"
+                topicId="infrared"
                 count={irCount}
                 svg={infraredIconSvg}
                 onClick={() => setActiveView("infrared")}
@@ -251,13 +323,15 @@ export function Dashboard() {
               />
               <LibraryStat
                 label="NFC"
+                topicId="nfc"
                 count={nfcCount}
                 svg={nfcIconSvg}
                 onClick={() => setActiveView("nfc")}
                 disabled={!isConnected && nfcCount === 0}
               />
               <LibraryStat
-                label="RFID"
+                label="RFID (125 kHz)"
+                topicId="rfid"
                 count={rfidCount}
                 svg={rfidIconSvg}
                 onClick={() => setActiveView("rfid")}
@@ -265,6 +339,7 @@ export function Dashboard() {
               />
               <LibraryStat
                 label="BadUSB"
+                topicId="badusb"
                 count={badusbCount}
                 svg={badusbIconSvg}
                 onClick={() => setActiveView("badusb")}
@@ -272,6 +347,7 @@ export function Dashboard() {
               />
               <LibraryStat
                 label="Apps"
+                topicId="apps"
                 count={appsCount}
                 svg={pluginsIconSvg}
                 onClick={() => setActiveView("apps")}
@@ -296,9 +372,18 @@ function ConnectionPill({
   kind: "serial" | "ble" | null;
   connected: boolean;
 }) {
+  const hint = !connected
+    ? CONNECTION_HINTS.offline
+    : kind === "ble"
+      ? CONNECTION_HINTS.ble
+      : CONNECTION_HINTS.usb;
+
   if (!connected) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-dim border border-border-subtle rounded">
+      <span
+        title={hint}
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-dim border border-border-subtle rounded cursor-help"
+      >
         Offline
       </span>
     );
@@ -306,7 +391,10 @@ function ConnectionPill({
   const Icon = kind === "ble" ? Bluetooth : Usb;
   const label = kind === "ble" ? "BLE" : "USB";
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-success bg-success/10 border border-success/30 rounded">
+    <span
+      title={hint}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-success bg-success/10 border border-success/30 rounded cursor-help"
+    >
       <Icon size={10} />
       {label}
     </span>
@@ -472,21 +560,25 @@ function StorageCard({
 
 function LibraryStat({
   label,
+  topicId,
   count,
   svg,
   onClick,
   disabled,
 }: {
   label: string;
+  topicId: string;
   count: number;
   svg: string;
   onClick: () => void;
   disabled: boolean;
 }) {
+  const tagline = getTutorialTopic(topicId)?.tagline;
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      title={tagline}
       className="flex items-center gap-3 px-3 py-2.5 bg-surface/60 hover:bg-elevated border border-border-subtle rounded transition-colors text-left disabled:opacity-40 disabled:cursor-not-allowed"
     >
       <FlipperSvgIcon svg={svg} size={20} />

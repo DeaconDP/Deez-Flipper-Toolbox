@@ -1,12 +1,33 @@
 # Changelog
 
-All notable changes to FlipperUI are documented in this file.
+All notable changes to Deez Flipper Tools (forked from [FlipperUI](https://github.com/fuckmaz/FlipperUI)) are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres (roughly) to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) while pre-1.0.
 
 ## [Unreleased]
 
-### Added
+### Fixed (Deez Flipper Tools)
+- **WiFi Board setup type** — Hardware setup (Custom GPIO vs Official Dev Board) now saves as soon as you pick it, so Field readiness no longer stays amber until Flash/Deploy. Release and FAP version lists show loading/error/retry when GitHub fetch fails. Launch RPC status 17 maps to clearer “another app is running” guidance.
+
+### Added (Deez Flipper Tools)
+- **WiFi Board Field tab** — Readiness checks, one-click companion launch + screen mirror, tethered Marauder console (passthrough/direct USB), grouped quick actions, live capture polling with batch download, GPIO OTG helper, and qFlipper Channel 0 passthrough guide.
+- **WiFi Board setup** — Wizard to flash ESP32 Marauder on custom boards (esptool), cache firmware from GitHub releases, deploy WiFi Marauder companion FAP to Flipper SD, and GPIO UART wiring hints on PC0/PC1.
+- New Tauri commands: `wifi_board_profiles`, `wifi_board_detect_tools`, `wifi_board_list_ports`, `wifi_board_list_releases`, `wifi_board_list_companion_releases`, `wifi_board_chip_id`, `wifi_board_fetch_release`, `wifi_board_flash`, `wifi_board_fetch_companion_fap`, `wifi_board_deploy_companion`, `wifi_board_cancel`, `wifi_board_health_check`, `wifi_board_field_status`, `marauder_console_start/send/stop/status/list_ports`, `marauder_list_captures`, `marauder_download_capture`.
+- **Backup & restore** — Full device backup (qFlipper-cli internal memory + SD `/ext` mirror) with progress events and restore.
+- **Firmware & OS** — Official/community/custom flash, qFlipper-cli integration, and automated SD `.zip` deploy to `/ext/update/`.
+- **FBT Build Studio** — Clone firmware repos, edit `fbt_options_local.py`, run builds, and flash artifacts.
+- **Dev Studio** — Tool detection, uFBT FAP workflow, and JS app scaffold/build/deploy to `/ext/apps/Scripts/`.
+- **Signal editors** — Local parse/edit/save for `.sub`, `.ir`, and `.nfc` files with push-to-device.
+- **Setup wizard** — First-run dependency check (qFlipper, Git, Python, Node, uFBT).
+- **Library on-device actions** — Sub-GHz TX, NFC/RFID emulate, Infrared send, and BadUSB run from library rows (with confirm dialogs and auto-stop on disconnect/nav away).
+- New Tauri commands: `nfc_emulate_start/stop`, `rfid_emulate_start/stop`, `infrared_tx_start/stop`, `badusb_run_start/stop`, `firmware_deploy_sd_zip`.
+
+### Changed (Deez Flipper Tools)
+- Rebranded app shell to **Deez Flipper Tools** (splash, settings about panel, setup wizard).
+- GPIO view graduated from beta — removed the BETA tag from the header.
+- Device Info remains reachable from Dashboard and Command Palette (not SideRail) to reduce nav clutter.
+
+### Added (from FlipperUI base)
 - GPIO view (new side-rail entry below the libraries). Shows a vertical illustration of the full 18-pin Flipper Zero header — click any pin to open a detail card on the right. The 8 RPC-controllable pins (PC0, PC1, PC3, PB2, PB3, PA4, PA6, PA7) expose Mode (INPUT/OUTPUT), Pull (none/up/down), live Read with a sparkline of the last 50 samples, Watch-mode polling, and a Write toggle with a quick "Pulse" action. Pin 1 has a +5V OTG switch with a 0.5 A warning. Non-controllable pins (power, ground, SWD debug, I2C bus, 1-Wire) render as info-only cards. Top bar has an OTG mirror chip, a Refresh action, a "Reset all to INPUT (no pull)" safety action, and a poll-interval slider that's floored to 500 ms over BLE. New Rust module + 8 Tauri commands (`gpio_snapshot`, `gpio_set_mode`, `gpio_get_mode`, `gpio_set_pull`, `gpio_read_pin`, `gpio_write_pin`, `gpio_get_otg`, `gpio_set_otg`) wrapping the firmware's existing GPIO RPC messages. The view title carries a small orange "BETA" tag while the feature is stabilizing.
 - Right-click context menus on every library view (Sub-GHz, Infrared, NFC, RFID, BadUSB, Apps). Items are tailored per library: SubGhz gets Star/Unstar + Open in Maps (when GPS coords exist) + Rename + Duplicate + Delete; NFC/RFID get Download + Rename + Duplicate + Delete; BadUSB gets Edit + Download + Rename + Duplicate + Delete; Apps gets Launch + Download + Rename + Delete; Infrared gets Rename + Duplicate + Delete. Inline hover-action buttons still work on every row. New shared `ui/ContextMenu.tsx` component; FileBrowser was refactored onto it too so all popups in the app share one implementation.
 - Pre-scan heavy-directory review for Sub-GHz / Infrared / NFC / RFID / BadUSB scans. Before each scan the app walks the library roots and lists every directory with 254+ direct entries or files larger than 1 MiB; the user picks which dirs to exclude with checkboxes, and the chosen paths are appended to that library's persistent exclusion list before the real scan starts. New shared Rust prewalk module + `library_prewalk` Tauri command emitting `library-prewalk-progress` events.

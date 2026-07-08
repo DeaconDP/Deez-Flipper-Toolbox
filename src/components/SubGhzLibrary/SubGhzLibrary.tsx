@@ -5,6 +5,7 @@ import { useFlipperStore } from "../../store/useFlipperStore";
 import { subghzCancelScan, subghzScan } from "../../lib/tauri";
 import { loadSettings, subscribeSettings, updateSettings } from "../../lib/settings";
 import { useLibraryPreScan } from "../../hooks/useLibraryPreScan";
+import { useLibrarySessionCleanup } from "../../hooks/useLibrarySessionCleanup";
 import { notify } from "../../lib/notify";
 import {
   loadSubghzCache,
@@ -13,7 +14,9 @@ import {
 } from "../../lib/subghzCache";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { LibraryTable } from "./LibraryTable";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
 import type { ScanProgress } from "../../types/subghz";
+import { getLibraryEmptyHint } from "../../lib/tutorialContent";
 
 const SUBGHZ_ROOT = "/ext/subghz";
 
@@ -36,6 +39,7 @@ export function SubGhzLibrary() {
   const [starredOnly, setStarredOnly] = useState(false);
   const [cacheScannedAt, setCacheScannedAt] = useState<number | null>(null);
   const { checkBeforeScan, modal: preScanModal } = useLibraryPreScan("subghz");
+  useLibrarySessionCleanup("subghz");
 
   const toggleFavorite = (path: string) => {
     const next = favorites.includes(path)
@@ -164,6 +168,7 @@ export function SubGhzLibrary() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <TutorialBanner topicId="subghz" />
       <LibraryToolbar
         protocols={protocols}
         protocolFilter={protocolFilter}
@@ -211,7 +216,7 @@ function EmptyState({ onScan }: { onScan: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-dim">
       <RadioTower size={40} strokeWidth={1.5} className="text-elevated" />
-      <p className="text-sm">No .sub files indexed yet.</p>
+      <p className="text-sm text-center max-w-sm">{getLibraryEmptyHint("subghz")}</p>
       <button
         onClick={onScan}
         className="px-3 py-1.5 text-xs text-primary bg-accent/20 border border-accent/40 rounded hover:bg-accent/30"

@@ -149,7 +149,7 @@ pub fn build_tray_menu(
         .item(&nav_settings)
         .separator();
 
-    let quit = MenuItemBuilder::with_id("tray-quit", "Quit FlipperUI").build(app)?;
+    let quit = MenuItemBuilder::with_id("tray-quit", "Quit Deez Flipper Tools").build(app)?;
     builder.item(&quit).build()
 }
 
@@ -219,7 +219,7 @@ fn pad_to_square(src: &tauri::image::Image<'_>, multiplier: u32) -> tauri::image
 pub fn install_tray(app: &tauri::AppHandle, monochrome: bool) -> tauri::Result<()> {
     let tray_menu = build_tray_menu(app, &commands::tray::tray_status())?;
     let tray = TrayIconBuilder::with_id(TRAY_ID)
-        .tooltip("FlipperUI")
+        .tooltip("Deez Flipper Tools")
         .icon(tray_icon_for(app, monochrome)?)
         .menu(&tray_menu)
         // Left-click opens the flyout menu (device status + nav shortcuts);
@@ -263,7 +263,7 @@ pub fn run() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    tracing::info!("FlipperUI starting up");
+    tracing::info!("Deez Flipper Tools starting up");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -290,7 +290,7 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 let about_meta = AboutMetadataBuilder::new()
-                    .name(Some("FlipperUI"))
+                    .name(Some("Deez Flipper Tools"))
                     .version(Some(env!("CARGO_PKG_VERSION")))
                     .copyright(Some("in love -maz"))
                     .build();
@@ -299,10 +299,10 @@ pub fn run() {
                     .accelerator("CmdOrCtrl+,")
                     .build(app)?;
 
-                let app_submenu = SubmenuBuilder::new(app, "FlipperUI")
+                let app_submenu = SubmenuBuilder::new(app, "Deez Flipper Tools")
                     .item(&PredefinedMenuItem::about(
                         app,
-                        Some("About FlipperUI"),
+                        Some("About Deez Flipper Tools"),
                         Some(about_meta),
                     )?)
                     .separator()
@@ -425,6 +425,7 @@ pub fn run() {
             commands::firmware::firmware_providers,
             commands::firmware::firmware_fetch_directory,
             commands::firmware::firmware_flash,
+            commands::firmware::firmware_deploy_sd_zip,
             commands::cli::cli_start,
             commands::cli::cli_send,
             commands::cli::cli_stop,
@@ -439,6 +440,14 @@ pub fn run() {
             commands::app::app_exit,
             commands::app::subghz_tx_start,
             commands::app::subghz_tx_stop,
+            commands::app::nfc_emulate_start,
+            commands::app::nfc_emulate_stop,
+            commands::app::rfid_emulate_start,
+            commands::app::rfid_emulate_stop,
+            commands::app::infrared_tx_start,
+            commands::app::infrared_tx_stop,
+            commands::app::badusb_run_start,
+            commands::app::badusb_run_stop,
             commands::subghz::subghz_scan,
             commands::subghz::subghz_cancel_scan,
             commands::infrared::infrared_scan,
@@ -464,6 +473,33 @@ pub fn run() {
             commands::tray::update_tray_status,
             commands::app_icon::app_icon_variants,
             commands::app_icon::set_app_icon,
+            commands::firmware::qflipper_run,
+            commands::backup::backup_default_dir,
+            commands::backup::backup_list,
+            commands::backup::backup_create_full,
+            commands::backup::backup_restore,
+            commands::tools::tools_detect,
+            commands::tools::tools_run,
+            commands::tools::tools_resolve_qflipper,
+            commands::fbt::fbt_firmware_bases,
+            commands::fbt::fbt_clone_repo,
+            commands::fbt::fbt_scan_manifests,
+            commands::fbt::fbt_read_config,
+            commands::fbt::fbt_write_config,
+            commands::fbt::fbt_list_artifacts,
+            commands::fbt::fbt_run,
+            commands::fbt::fbt_profiles_dir,
+            commands::fbt::fbt_save_profile,
+            commands::fbt::fbt_load_profile,
+            commands::fbt::fbt_list_profiles,
+            commands::formats::formats_parse_subghz,
+            commands::formats::formats_serialize_subghz,
+            commands::formats::formats_parse_ir,
+            commands::formats::formats_serialize_ir,
+            commands::formats::formats_parse_nfc,
+            commands::formats::formats_serialize_nfc,
+            commands::formats::formats_read_local_file,
+            commands::formats::formats_write_local_file,
             commands::gpio::gpio_snapshot,
             commands::gpio::gpio_set_mode,
             commands::gpio::gpio_get_mode,
@@ -472,6 +508,26 @@ pub fn run() {
             commands::gpio::gpio_write_pin,
             commands::gpio::gpio_get_otg,
             commands::gpio::gpio_set_otg,
+            commands::wifi_board::wifi_board_profiles,
+            commands::wifi_board::wifi_board_detect_tools,
+            commands::wifi_board::wifi_board_list_ports,
+            commands::wifi_board::wifi_board_list_releases,
+            commands::wifi_board::wifi_board_list_companion_releases,
+            commands::wifi_board::wifi_board_chip_id,
+            commands::wifi_board::wifi_board_fetch_release,
+            commands::wifi_board::wifi_board_flash,
+            commands::wifi_board::wifi_board_fetch_companion_fap,
+            commands::wifi_board::wifi_board_deploy_companion,
+            commands::wifi_board::wifi_board_cancel,
+            commands::wifi_board::wifi_board_health_check,
+            commands::wifi_board::wifi_board_field_status,
+            commands::marauder_console::marauder_console_start,
+            commands::marauder_console::marauder_console_send,
+            commands::marauder_console::marauder_console_stop,
+            commands::marauder_console::marauder_console_status,
+            commands::marauder_console::marauder_console_list_ports,
+            commands::marauder_captures::marauder_list_captures,
+            commands::marauder_captures::marauder_download_capture,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

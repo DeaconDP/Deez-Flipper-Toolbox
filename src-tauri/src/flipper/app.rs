@@ -64,6 +64,15 @@ pub fn app_load_file(client: &mut FlipperClient, path: &str) -> Result<()> {
 /// Press a button in the current app's RPC interface.
 /// For Sub-GHz with a loaded file, args="" triggers the default "send" action.
 pub fn app_button_press(client: &mut FlipperClient, args: &str) -> Result<()> {
+    app_button_press_index(client, args, 0)
+}
+
+/// Press a button by args and/or index — some apps (NFC Emulate) key off index.
+pub fn app_button_press_index(
+    client: &mut FlipperClient,
+    args: &str,
+    index: i32,
+) -> Result<()> {
     let id = client.next_command_id();
     let req = pb::Main {
         command_id: id,
@@ -72,7 +81,7 @@ pub fn app_button_press(client: &mut FlipperClient, args: &str) -> Result<()> {
         content: Some(Content::AppButtonPressRequest(
             pb_app::AppButtonPressRequest {
                 args: args.to_string(),
-                index: 0,
+                index,
             },
         )),
     };

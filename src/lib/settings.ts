@@ -105,6 +105,33 @@ export interface AppSettings {
      * library's persistent `excludedDirs`. Apps is not affected. */
     preScanReview: boolean;
   };
+  tools: {
+    qflipperCliPath: string | null;
+    ufbtPath: string | null;
+    nodePath: string | null;
+    esptoolPath: string | null;
+  };
+  wifiBoard: {
+    lastProfile: string | null;
+    lastEspPort: string | null;
+    lastMarauderTag: string | null;
+    lastCompanionTag: string | null;
+    setupType: "custom_gpio" | "official_devboard" | null;
+    autoOpenScreenStream: boolean;
+  };
+  setup: {
+    completed: boolean;
+  };
+  tutorial: {
+    /** When true, contextual help panels appear throughout the app. */
+    enabled: boolean;
+    /** When true, tutorial panels show only their title bar until expanded. */
+    collapsed: boolean;
+  };
+  hints: {
+    /** When true, plain-language taglines appear on each screen. */
+    enabled: boolean;
+  };
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -132,6 +159,30 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   libraries: {
     preScanReview: true,
+  },
+  tools: {
+    qflipperCliPath: null,
+    ufbtPath: null,
+    nodePath: null,
+    esptoolPath: null,
+  },
+  wifiBoard: {
+    lastProfile: null,
+    lastEspPort: null,
+    lastMarauderTag: null,
+    lastCompanionTag: null,
+    setupType: null,
+    autoOpenScreenStream: true,
+  },
+  setup: {
+    completed: false,
+  },
+  tutorial: {
+    enabled: false,
+    collapsed: false,
+  },
+  hints: {
+    enabled: true,
   },
 };
 
@@ -190,6 +241,30 @@ export type SettingsPatch = {
   };
   libraries?: {
     preScanReview?: boolean;
+  };
+  tools?: {
+    qflipperCliPath?: string | null;
+    ufbtPath?: string | null;
+    nodePath?: string | null;
+    esptoolPath?: string | null;
+  };
+  wifiBoard?: {
+    lastProfile?: string | null;
+    lastEspPort?: string | null;
+    lastMarauderTag?: string | null;
+    lastCompanionTag?: string | null;
+    setupType?: "custom_gpio" | "official_devboard" | null;
+    autoOpenScreenStream?: boolean;
+  };
+  setup?: {
+    completed?: boolean;
+  };
+  tutorial?: {
+    enabled?: boolean;
+    collapsed?: boolean;
+  };
+  hints?: {
+    enabled?: boolean;
   };
 };
 
@@ -307,6 +382,60 @@ async function updateSettingsNow(patch: SettingsPatch): Promise<AppSettings> {
       preScanReview:
         patch.libraries?.preScanReview ?? current.libraries.preScanReview,
     },
+    tools: {
+      qflipperCliPath:
+        patch.tools?.qflipperCliPath !== undefined
+          ? patch.tools.qflipperCliPath
+          : current.tools.qflipperCliPath,
+      ufbtPath:
+        patch.tools?.ufbtPath !== undefined
+          ? patch.tools.ufbtPath
+          : current.tools.ufbtPath,
+      nodePath:
+        patch.tools?.nodePath !== undefined
+          ? patch.tools.nodePath
+          : current.tools.nodePath,
+      esptoolPath:
+        patch.tools?.esptoolPath !== undefined
+          ? patch.tools.esptoolPath
+          : current.tools.esptoolPath,
+    },
+    wifiBoard: {
+      lastProfile:
+        patch.wifiBoard?.lastProfile !== undefined
+          ? patch.wifiBoard.lastProfile
+          : current.wifiBoard.lastProfile,
+      lastEspPort:
+        patch.wifiBoard?.lastEspPort !== undefined
+          ? patch.wifiBoard.lastEspPort
+          : current.wifiBoard.lastEspPort,
+      lastMarauderTag:
+        patch.wifiBoard?.lastMarauderTag !== undefined
+          ? patch.wifiBoard.lastMarauderTag
+          : current.wifiBoard.lastMarauderTag,
+      lastCompanionTag:
+        patch.wifiBoard?.lastCompanionTag !== undefined
+          ? patch.wifiBoard.lastCompanionTag
+          : current.wifiBoard.lastCompanionTag,
+      setupType:
+        patch.wifiBoard?.setupType !== undefined
+          ? patch.wifiBoard.setupType
+          : current.wifiBoard.setupType,
+      autoOpenScreenStream:
+        patch.wifiBoard?.autoOpenScreenStream !== undefined
+          ? patch.wifiBoard.autoOpenScreenStream
+          : current.wifiBoard.autoOpenScreenStream,
+    },
+    setup: {
+      completed: patch.setup?.completed ?? current.setup.completed,
+    },
+    tutorial: {
+      enabled: patch.tutorial?.enabled ?? current.tutorial.enabled,
+      collapsed: patch.tutorial?.collapsed ?? current.tutorial.collapsed,
+    },
+    hints: {
+      enabled: patch.hints?.enabled ?? current.hints.enabled,
+    },
   };
   await store.set(STORE_KEY, next);
   cached = next;
@@ -410,6 +539,40 @@ function mergeWithDefaults(raw: Partial<AppSettings>): AppSettings {
       preScanReview:
         raw.libraries?.preScanReview ??
         DEFAULT_SETTINGS.libraries.preScanReview,
+    },
+    tools: {
+      qflipperCliPath:
+        raw.tools?.qflipperCliPath ?? DEFAULT_SETTINGS.tools.qflipperCliPath,
+      ufbtPath: raw.tools?.ufbtPath ?? DEFAULT_SETTINGS.tools.ufbtPath,
+      nodePath: raw.tools?.nodePath ?? DEFAULT_SETTINGS.tools.nodePath,
+      esptoolPath: raw.tools?.esptoolPath ?? DEFAULT_SETTINGS.tools.esptoolPath,
+    },
+    wifiBoard: {
+      lastProfile:
+        raw.wifiBoard?.lastProfile ?? DEFAULT_SETTINGS.wifiBoard.lastProfile,
+      lastEspPort:
+        raw.wifiBoard?.lastEspPort ?? DEFAULT_SETTINGS.wifiBoard.lastEspPort,
+      lastMarauderTag:
+        raw.wifiBoard?.lastMarauderTag ??
+        DEFAULT_SETTINGS.wifiBoard.lastMarauderTag,
+      lastCompanionTag:
+        raw.wifiBoard?.lastCompanionTag ??
+        DEFAULT_SETTINGS.wifiBoard.lastCompanionTag,
+      setupType:
+        raw.wifiBoard?.setupType ?? DEFAULT_SETTINGS.wifiBoard.setupType,
+      autoOpenScreenStream:
+        raw.wifiBoard?.autoOpenScreenStream ??
+        DEFAULT_SETTINGS.wifiBoard.autoOpenScreenStream,
+    },
+    setup: {
+      completed: raw.setup?.completed ?? DEFAULT_SETTINGS.setup.completed,
+    },
+    tutorial: {
+      enabled: raw.tutorial?.enabled ?? DEFAULT_SETTINGS.tutorial.enabled,
+      collapsed: raw.tutorial?.collapsed ?? DEFAULT_SETTINGS.tutorial.collapsed,
+    },
+    hints: {
+      enabled: raw.hints?.enabled ?? DEFAULT_SETTINGS.hints.enabled,
     },
   };
 }

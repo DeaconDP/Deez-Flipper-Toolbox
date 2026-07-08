@@ -8,6 +8,8 @@ export function ErrorBanner() {
 
   useEffect(() => {
     if (!error) return;
+    // Keep USB/BLE connection guidance visible until the user dismisses it.
+    if (/flipper|usb|bluetooth|com\d|unplugged|replug/i.test(error)) return;
     const timer = setTimeout(() => setError(null), 6000);
     return () => clearTimeout(timer);
   }, [error, setError]);

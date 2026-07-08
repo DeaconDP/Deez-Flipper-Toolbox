@@ -19,8 +19,11 @@ import {
   storageRead,
   storageRename,
   storageWrite,
+  nfcEmulateStart,
+  nfcEmulateStop,
 } from "../../lib/tauri";
 import { saveNfcCache } from "../../lib/nfcCache";
+import { confirmLibraryAction, stopAllLibrarySessions } from "../../lib/librarySessions";
 import { useExportDrag } from "../../hooks/useExportDrag";
 import { relativeDir, parentDir, nextDuplicateName } from "../../lib/path";
 import { formatSize, formatMtime } from "../../lib/format";
@@ -187,11 +190,14 @@ function Row({
   const setError = useFlipperStore((s) => s.setNfcError);
   const setEntries = useFlipperStore((s) => s.setNfcEntries);
   const deviceUid = useFlipperStore((s) => s.deviceInfo?.hardware_uid ?? null);
+  const isConnected = useFlipperStore((s) => s.isConnected);
+  const emulatingPath = useFlipperStore((s) => s.nfcEmulatingPath);
+  const setEmulatingPath = useFlipperStore((s) => s.setNfcEmulatingPath);
 
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [busy, setBusy] = useState<
-    "rename" | "dup" | "delete" | "download" | null
+    "rename" | "dup" | "delete" | "download" | "emulate" | null
   >(null);
 
   const relDir = relativeDir(entry.path, NFC_ROOT);
@@ -300,6 +306,45 @@ function Row({
       await persistList(allEntries.filter((e) => e.path !== entry.path));
     } catch (e) {
       setError(`Delete failed: ${(e as Error).message || String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const isEmulating = emulatingPath === entry.path;
+  const anyEmulating = emulatingPath !== null;
+
+  const onToggleEmulate = async () => {
+    if (!isConnected) {
+      setError("Connect a Flipper to emulate.");
+      return;
+    }
+    if (isEmulating) {
+      setBusy("emulate");
+      try {
+        await nfcEmulateStop();
+        setEmulatingPath(null);
+      } catch (e) {
+        setError(`Stop emulate failed: ${(e as Error).message || String(e)}`);
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+    if (anyEmulating) return;
+    const ok = await confirmLibraryAction(
+      "Emulate NFC tag",
+      `Emulate ${entry.name} on the Flipper NFC field?\n\nOnly use on systems you own or have permission to test.`,
+    );
+    if (!ok) return;
+    setBusy("emulate");
+    try {
+      await stopAllLibrarySessions();
+      await nfcEmulateStart(entry.path);
+      setEmulatingPath(entry.path);
+    } catch (e) {
+      setError(`Emulate failed: ${(e as Error).message || String(e)}`);
+      setEmulatingPath(null);
     } finally {
       setBusy(null);
     }
@@ -429,12 +474,25 @@ function Row({
           <Trash2 size={13} />
         </button>
         <button
-          disabled
-          title="Emulation coming soon"
-          className="flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border border-border-subtle text-dim opacity-40 cursor-not-allowed"
+          onClick={() => void onToggleEmulate()}
+          disabled={!isConnected || (anyEmulating && !isEmulating) || busy !== null || renaming}
+          title={
+            !isConnected
+              ? "Connect a Flipper to emulate"
+              : isEmulating
+                ? "Stop emulation"
+                : anyEmulating
+                  ? "Another tag is emulating"
+                  : "Emulate on Flipper"
+          }
+          className={`flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+            isEmulating
+              ? "border-accent/50 bg-accent/15 text-accent animate-pulse"
+              : "border-border-subtle text-secondary hover:text-accent hover:border-accent/40"
+          }`}
         >
           <Radio size={10} />
-          Emulate
+          {isEmulating ? "Stop" : "Emulate"}
         </button>
       </div>
     </div>

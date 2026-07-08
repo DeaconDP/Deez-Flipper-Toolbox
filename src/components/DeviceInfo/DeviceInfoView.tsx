@@ -14,6 +14,8 @@ import {
 import { deviceInfoAll, powerInfo, storageDu, storageInfo } from "../../lib/tauri";
 import { useFlipperStore } from "../../store/useFlipperStore";
 import { Spinner } from "../ui/Spinner";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { FeatureContextBar } from "../ui/FeatureContextBar";
 import type { StorageInfo as StorageInfoType } from "../../types/flipper";
 
 import blackFlipper from "../../assets/flipper-zero/FZBlackNormal.svg";
@@ -165,6 +167,8 @@ export function DeviceInfoView() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <TutorialBanner topicId="info" />
+      <FeatureContextBar topicId="info" />
       <header className="shrink-0 border-b border-border-subtle bg-panel">
         <div className="flex items-center gap-2 px-3 py-2">
           <Info size={14} className="text-accent" />

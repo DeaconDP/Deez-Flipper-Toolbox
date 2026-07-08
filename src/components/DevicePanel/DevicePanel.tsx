@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Usb, Power, BatteryLow, BatteryMedium, BatteryFull, BatteryWarning, Zap, HardDrive, Bluetooth, Signal, SignalLow, SignalMedium, SignalHigh, Link as LinkIcon, Unlink } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { connect, disconnect, listPorts, powerInfo, storageInfo, reboot, ping } from "../../lib/tauri";
+import { stopAllLibrarySessions } from "../../lib/librarySessions";
 import { useFlipperStore } from "../../store/useFlipperStore";
 import { loadSettings, subscribeSettings, updateSettings } from "../../lib/settings";
 import { syncClockOnConnectIfEnabled } from "../../lib/clockSync";
@@ -9,6 +10,7 @@ import { Spinner } from "../ui/Spinner";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { BleDialog } from "./BleDialog";
 import { GlobalSearch } from "../GlobalSearch/GlobalSearch";
+import { CONNECTION_HINTS } from "../../lib/tutorialContent";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -23,6 +25,7 @@ export function DevicePanel() {
   const deviceInfo = useFlipperStore((s) => s.deviceInfo);
   const isConnected = useFlipperStore((s) => s.isConnected);
   const isConnecting = useFlipperStore((s) => s.isConnecting);
+  const connectionKind = useFlipperStore((s) => s.connectionKind);
   const setPorts = useFlipperStore((s) => s.setPorts);
   const setSelectedPort = useFlipperStore((s) => s.setSelectedPort);
   const setConnecting = useFlipperStore((s) => s.setConnecting);
@@ -111,14 +114,42 @@ export function DevicePanel() {
         setPorts(p);
 
         const state = useFlipperStore.getState();
-        const flipper = p.find((x) => x.is_flipper);
+        const flipper = p.find((x) => x.is_flipper && x.available !== false);
+        const phantomFlipper = p.find((x) => x.is_flipper && x.available === false);
+        const btFlipperPorts = p.filter((x) => x.is_flipper_bt);
 
-        // Auto-select first Flipper port if none selected. The persisted
+        // Surface actionable USB connection guidance when no live Flipper USB port exists.
+        if (transport === "usb" && !state.isConnected && !state.isConnecting && !flipper) {
+          let usbHint: string | null = null;
+          if (phantomFlipper) {
+            const btHint =
+              btFlipperPorts.length > 0
+                ? ` Your Flipper is paired over Bluetooth (${btFlipperPorts.map((x) => x.name).join(", ")}) — switch to BLE mode, or plug in a USB cable.`
+                : " Plug in the Flipper with a USB data cable and select the new COM port.";
+            usbHint = `${phantomFlipper.name} is a stale Flipper USB port (device unplugged).${btHint}`;
+          } else if (btFlipperPorts.length > 0) {
+            usbHint = `No Flipper USB port found. Bluetooth serial ${btFlipperPorts.map((x) => x.name).join(", ")} detected — switch the transport toggle to BLE, or connect a USB cable for USB mode.`;
+          } else if (!p.some((x) => x.is_flipper)) {
+            usbHint =
+              "No Flipper USB port detected. Connect your Flipper with a USB data cable (not charge-only).";
+          }
+          if (usbHint && state.error !== usbHint) {
+            setError(usbHint);
+          }
+        }
+
+        // Auto-select first available Flipper port if none selected. The persisted
         // lastPort has already been applied in the hydrate effect, so if
         // selectedPort is still null at this point either there was no stored
         // port or the stored port isn't currently present.
         if (!state.selectedPort && flipper) {
           setSelectedPort(flipper.name);
+        } else if (
+          state.selectedPort &&
+          !p.some((x) => x.name === state.selectedPort && x.available !== false)
+        ) {
+          // Drop stale selection (phantom port or disappeared device).
+          setSelectedPort(flipper?.name ?? null);
         }
 
         // Clear userDisconnected when no Flipper ports are present
@@ -281,6 +312,13 @@ export function DevicePanel() {
 
   const handleConnect = async () => {
     if (!selectedPort) return;
+    const portEntry = ports.find((p) => p.name === selectedPort);
+    if (portEntry?.available === false) {
+      setError(
+        `${selectedPort} is not available — reconnect the Flipper via USB and select the active COM port.`,
+      );
+      return;
+    }
     // Manual connect always overrides any auto-connect cooldown — the user is
     // explicitly asking to retry, so reset both the failed-port map and the
     // userDisconnected flag.
@@ -302,6 +340,7 @@ export function DevicePanel() {
 
   const handleDisconnect = async () => {
     setUserDisconnected(true); // suppress auto-connect until re-plug
+    await stopAllLibrarySessions().catch(() => {});
     try {
       await disconnect();
     } catch {
@@ -312,6 +351,7 @@ export function DevicePanel() {
 
   const handleReboot = async () => {
     // userDisconnected stays false so we auto-reconnect after reboot
+    await stopAllLibrarySessions().catch(() => {});
     try {
       await reboot(0); // 0 = normal OS reboot
     } catch {
@@ -326,6 +366,22 @@ export function DevicePanel() {
       ? Math.round(((sdTotal - sdFree) / sdTotal) * 100)
       : null;
 
+  const liveUsbFlipper = ports.find((p) => p.is_flipper && p.available !== false);
+  const hasBtFlipper = ports.some((p) => p.is_flipper_bt);
+  const showBleShortcut =
+    transport === "usb" && !isConnected && !isConnecting && !liveUsbFlipper && hasBtFlipper;
+
+  const handleBleShortcut = () => {
+    handleTransportChange("ble");
+    setShowBleDialog(true);
+  };
+
+  const capabilityHint = !isConnected
+    ? CONNECTION_HINTS.offline
+    : connectionKind === "ble"
+      ? CONNECTION_HINTS.ble
+      : CONNECTION_HINTS.usb;
+
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-panel border-b border-flipper shrink-0">
       {/* Title — the "UI" orange is the FlipperUI brand mark, intentionally
@@ -337,9 +393,12 @@ export function DevicePanel() {
       <div className="w-px h-4 bg-elevated mx-1" />
 
       {/* Transport toggle (USB / BLE) */}
-      <div className="flex items-center gap-2 select-none">
+      <div
+        className="flex items-center gap-2 select-none cursor-help"
+        title={capabilityHint}
+      >
         <Usb
-          className={`w-3.5 h-3.5 ${transport === "usb" ? "text-primary" : "text-muted"}`}
+          className={`w-3.5 h-3.5 ${transport === "usb" ? "text-white" : "text-muted"}`}
           aria-label="USB"
         />
         <button
@@ -377,9 +436,22 @@ export function DevicePanel() {
           {ports.map((p) => (
             <option key={p.name} value={p.name} className="bg-surface text-primary">
               {p.name.startsWith("/dev/") ? p.name.slice(5) : p.name}
+              {p.is_flipper ? " (Flipper USB)" : p.is_flipper_bt ? " (Flipper BT)" : ""}
+              {p.available === false ? " — unplugged" : ""}
             </option>
           ))}
         </select>
+      )}
+
+      {showBleShortcut && (
+        <button
+          type="button"
+          onClick={handleBleShortcut}
+          className="text-xs px-2 py-1 rounded bg-accent-dim hover:bg-accent-hover text-white whitespace-nowrap"
+          title="No Flipper USB port detected — your device is paired over Bluetooth"
+        >
+          Connect via BLE
+        </button>
       )}
 
       {/* Connect / Disconnect button */}
@@ -387,7 +459,7 @@ export function DevicePanel() {
         transport === "usb" ? (
           <button
             onClick={handleConnect}
-            disabled={!selectedPort || isConnecting}
+            disabled={!selectedPort || isConnecting || ports.find((p) => p.name === selectedPort)?.available === false}
             aria-label={isConnecting ? "Connecting" : "Connect"}
             title={isConnecting ? "Connecting…" : "Connect"}
             className="flex items-center justify-center px-2 py-1 bg-accent-dim hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-white rounded transition-colors"
@@ -421,11 +493,11 @@ export function DevicePanel() {
         <div className="flex items-center gap-2 ml-1 text-xs">
           {/* Status pill: pulsing dot + device name + fw */}
           <div
-            className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface border border-elevated"
+            className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface border border-elevated cursor-help"
             title={
               deviceInfo.firmware_build_date
-                ? `Built ${deviceInfo.firmware_build_date}`
-                : undefined
+                ? `${capabilityHint} · Built ${deviceInfo.firmware_build_date}`
+                : capabilityHint
             }
           >
             <span className="relative flex h-2 w-2 shrink-0">

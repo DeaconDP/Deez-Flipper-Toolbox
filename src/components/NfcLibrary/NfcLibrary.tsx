@@ -5,12 +5,15 @@ import { useFlipperStore } from "../../store/useFlipperStore";
 import { nfcCancelScan, nfcParsePaths, nfcScan } from "../../lib/tauri";
 import { loadSettings, subscribeSettings, updateSettings } from "../../lib/settings";
 import { useLibraryPreScan } from "../../hooks/useLibraryPreScan";
+import { useLibrarySessionCleanup } from "../../hooks/useLibrarySessionCleanup";
 import { loadNfcCache, saveNfcCache } from "../../lib/nfcCache";
 import { notify } from "../../lib/notify";
 import { useLibraryDrop } from "../../hooks/useLibraryDrop";
 import { LibraryDropOverlay } from "../ui/LibraryDropOverlay";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { LibraryTable } from "./LibraryTable";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { getLibraryEmptyHint } from "../../lib/tutorialContent";
 import type { NfcScanProgress } from "../../types/nfc";
 
 const NFC_ROOT = "/ext/nfc";
@@ -31,6 +34,7 @@ export function NfcLibrary() {
   const [deviceTypeFilter, setDeviceTypeFilter] = useState<string | null>(null);
   const [cacheScannedAt, setCacheScannedAt] = useState<number | null>(null);
   const { checkBeforeScan, modal: preScanModal } = useLibraryPreScan("nfc");
+  useLibrarySessionCleanup("nfc");
 
   useEffect(() => {
     loadSettings().then((s) => setExcludedDirs(s.nfc.excludedDirs));
@@ -200,6 +204,7 @@ export function NfcLibrary() {
       className="flex-1 min-h-0 flex flex-col overflow-hidden relative"
       {...dropZoneHandlers}
     >
+      <TutorialBanner topicId="nfc" />
       <LibraryToolbar
         deviceTypes={deviceTypes}
         deviceTypeFilter={deviceTypeFilter}
@@ -247,7 +252,7 @@ function EmptyState({ onScan }: { onScan: () => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-dim">
       <Nfc size={40} strokeWidth={1.5} className="text-elevated" />
-      <p className="text-sm">No .nfc files indexed yet.</p>
+      <p className="text-sm text-center max-w-sm">{getLibraryEmptyHint("nfc")}</p>
       <button
         onClick={onScan}
         className="px-3 py-1.5 text-xs text-primary bg-accent/20 border border-accent/40 rounded hover:bg-accent/30"

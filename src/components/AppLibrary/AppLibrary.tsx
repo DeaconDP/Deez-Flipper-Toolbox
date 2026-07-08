@@ -16,6 +16,9 @@ import { loadAppsCache, saveAppIcons, saveAppsCache } from "../../lib/appsCache"
 import { notify } from "../../lib/notify";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { LibraryTable } from "./LibraryTable";
+import { TutorialBanner } from "../Tutorial/TutorialBanner";
+import { FeatureContextBar } from "../ui/FeatureContextBar";
+import { getLibraryEmptyHint } from "../../lib/tutorialContent";
 import { basename } from "../../lib/path";
 import type { AppScanProgress } from "../../types/apps";
 
@@ -305,6 +308,8 @@ export function AppLibrary() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+      <TutorialBanner topicId="apps" />
+      <FeatureContextBar topicId="apps" />
       <LibraryToolbar
         roots={roots}
         categories={categories}
@@ -356,7 +361,7 @@ function EmptyState({ onScan, roots }: { onScan: () => void; roots: string[] }) 
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-dim">
       <LayoutGrid size={40} strokeWidth={1.5} className="text-elevated" />
-      <p className="text-sm">No apps indexed yet.</p>
+      <p className="text-sm text-center max-w-sm">{getLibraryEmptyHint("apps")}</p>
       <p className="text-[11px] text-dim max-w-md text-center">
         Scans: {roots.join(", ")}
       </p>
