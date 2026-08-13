@@ -1,63 +1,48 @@
 # Deez Flipper Toolbox
 
-Desktop manager for Flipper Zero — forked from [FlipperUI](https://github.com/fuckmaz/FlipperUI) and extended with backup, firmware, FBT build studio, signal editors, and dev tools.
+<p align="center">
+  <img src="https://cdn.jsdelivr.net/gh/DeaconDP/Deez-Flipper-Toolbox@PLACEHOLDER/docs/screenshots/hero.png" alt="Deez Flipper Toolbox" width="720" />
+</p>
 
-Created by [deac.online @ worldbuild.io](https://deac.online)
+Desktop manager for Flipper Zero — backup, firmware, FBT studio, signal editors, and dev tools.
 
-## Features
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+![Platform: Desktop (Tauri)](https://img.shields.io/badge/platform-Desktop%20(Tauri)-informational)
 
-- **File manager & libraries** — Sub-GHz, IR, NFC, RFID, BadUSB, Apps (from FlipperUI)
-- **Backup & restore** — Internal memory via qFlipper-cli + full SD card mirror
-- **Firmware & OS** — Official/community updates, local `.tgz`/`.dfu` flash
-- **FBT Build Studio** — Clone firmware, configure `fbt_options_local.py`, build & flash custom OS
-- **Signal editors** — Sub-GHz, IR, NFC with raw + form views
-- **Dev Studio** — uFBT FAP builds and JS app scaffolding
-- **WiFi Board setup** — Flash ESP32 Marauder firmware (custom boards), deploy WiFi Marauder companion FAP, Field tab for launch/mirror/console/captures, GPIO wiring guide
-- **Setup wizard** — Detects qFlipper-cli, Git, Python, Node, uFBT, esptool
-- **Tutorial mode** — Corner toggle that explains every Flipper feature and app section with official learn-more links
+## Who it’s for
 
-## Development
+Flipper Zero owners who want a fuller desktop workflow than the stock companion alone.
+
+## Quick start
+
+**Requires** Node.js + Rust for the Tauri shell.
 
 ```bash
 npm install
-npm run tauri dev
+npm run tauri:dev
 ```
 
-## Build installer
+Forked from [FlipperUI](https://github.com/fuckmaz/FlipperUI) and extended.
 
-```bash
-npm run tauri build
-```
+## Features
 
-## Prerequisites
+- Backup and firmware workflows
+- FBT build studio
+- Signal editors and extra dev tools
 
-- [Rust](https://rustup.rs/) + MSVC (Windows)
-- Node.js 20+
-- [qFlipper](https://update.flipperzero.one/) (firmware flash & internal backup)
-- Git + Python (FBT firmware builds)
-- uFBT (`pip install ufbt`) for FAP app development
-- esptool (`pip install esptool`, or [uv](https://github.com/astral-sh/uv) for `uvx --from esptool esptool`) for WiFi dev board flashing
+## Limitations
 
-## WiFi dev board (custom ESP32)
+- Needs a connected Flipper for device features
+- Some tooling assumes a Flipper/FBT toolchain on the host
 
-1. Open **WiFi Board** in the side rail.
-2. Wire ESP **RX** ← Flipper **PC1 (TX)**, ESP **TX** → Flipper **PC0 (RX)**, plus **GND** and **3.3V**.
-3. Connect the ESP32 to your PC over USB and pick its COM port (Flipper ports are excluded).
-4. Choose a board profile (generic headless ESP32 → **LDDB**; detect chip if unsure).
-5. Download a [Marauder release](https://github.com/justcallmekoko/ESP32Marauder/releases) and **Flash** (full flash for new boards).
-6. With Flipper connected, **Deploy** the [WiFi Marauder companion FAP](https://github.com/0xchocolate/flipperzero-wifi-marauder) to `/ext/apps/GPIO/`.
-7. On the Flipper: **Apps → GPIO → WiFi Marauder** with the ESP attached to the GPIO header — or use the **Field** tab to launch from the desktop and mirror the UI.
+## Development
 
-### Field use (Flipper tethered to PC)
+`npm run tauri:dev` / `npm run build`
 
-1. Open **WiFi Board → Field**.
-2. Verify readiness (Flipper connected, companion FAP on SD).
-3. **Launch WiFi Marauder** — optionally opens Screen Stream automatically.
-4. **GPIO ESP32:** control via mirrored Flipper UI; pull captures from SD as they appear.
-5. **Official dev board:** enable qFlipper USB Channel 0 @ 115200 for tethered Marauder CLI in the Field console.
+## Credit
 
-Marauder features are for authorized testing on networks you own or have permission to assess.
+Created by [deac.online](https://deac.online) @ [worldbuild.io](https://worldbuild.io)
 
 ## License
 
-[MIT](LICENSE) — see [FlipperUI](https://github.com/fuckmaz/FlipperUI) for upstream lineage.
+MIT — see [LICENSE](LICENSE).
