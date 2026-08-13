@@ -1,7 +1,7 @@
 # Deez Flipper Toolbox
 
 <p align="center">
-  <img src="https://cdn.jsdelivr.net/gh/DeaconDP/Deez-Flipper-Toolbox@PLACEHOLDER/docs/screenshots/hero.png" alt="Deez Flipper Toolbox" width="720" />
+  <img src="https://cdn.jsdelivr.net/gh/DeaconDP/Deez-Flipper-Toolbox@c2ebe5f1fbb7fe6be5216e3045f414694b147d40/docs/screenshots/hero.png" alt="Deez Flipper Toolbox" width="720" />
 </p>
 
 Desktop manager for Flipper Zero — backup, firmware, FBT studio, signal editors, and dev tools.
